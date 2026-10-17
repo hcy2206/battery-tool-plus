@@ -15,6 +15,11 @@ mkdir -p "$OUT" "$STAGE/$NAME"
 ./scripts/build-macos.sh
 codesign --verify --deep --strict dist/BatteryTool.app
 plutil -lint dist/BatteryTool.app/Contents/Info.plist
+MIN_OS=$(xcrun vtool -show-build dist/BatteryTool.app/Contents/MacOS/BatteryTool | awk '/minos/{print $2}')
+if [[ "$MIN_OS" != "15.0" ]]; then
+    echo "Unexpected binary deployment target: $MIN_OS (expected 15.0)" >&2
+    exit 1
+fi
 ditto dist/BatteryTool.app "$STAGE/$NAME/BatteryTool.app"
 cp README.md LICENSE THIRD_PARTY_NOTICES.md RELEASE_NOTES.md "$STAGE/$NAME/"
 cp -R LICENSES "$STAGE/$NAME/"

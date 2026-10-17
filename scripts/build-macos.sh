@@ -17,7 +17,7 @@ export MACOSX_DEPLOYMENT_TARGET=15.0
 for source in smc smc_wrapper power_sources; do
     /usr/bin/clang -O2 -c "c/$source.c" -o "$BUILD/$source.o"
 done
-xcrun swiftc -module-cache-path "$BUILD/ModuleCache" -swift-version 5 -O -parse-as-library -import-objc-header macos/Bridge.h \
+xcrun swiftc -target arm64-apple-macosx15.0 -module-cache-path "$BUILD/ModuleCache" -swift-version 5 -O -parse-as-library -import-objc-header macos/Bridge.h \
     macos/Sources/*.swift "$BUILD/smc.o" "$BUILD/smc_wrapper.o" "$BUILD/power_sources.o" \
     -framework SwiftUI -framework AppKit -framework Metal -framework IOKit -framework CoreFoundation \
     -framework CoreGraphics -framework Charts -lsqlite3 -o "$APP/Contents/MacOS/BatteryTool"

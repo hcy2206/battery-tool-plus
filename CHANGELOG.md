@@ -18,6 +18,7 @@ This project is a fork of [BatteryTool](https://github.com/oresttokovenko/batter
 - CLI argument parsing, threshold validation, error exit codes and SMC failure handling.
 - Charging restoration, charger-disconnection handling, duplicate logging and C input validation.
 - Editable-build dependencies and coordination between CLI and native power control.
+- Explicit macOS 15 Swift deployment target, checked against the packaged binary.
 
 ### Documentation
 
