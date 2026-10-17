@@ -22,7 +22,8 @@ open dist/BatteryTool.app
 ```
 
 生成的是本机 ad-hoc 签名的开发应用。可以直接使用；尚未做 Developer ID 签名与公证，
-不作为向其他电脑分发的安装包。不要使用 sudo 启动整个图形应用。
+测试版通过 GitHub Release 分发，首次打开可能被 Gatekeeper 拦截；
+请参阅[下载与本地签名说明](../README.md#下载与安装测试版)。不要使用 sudo 启动整个图形应用。
 
 只查看界面和模拟模式切换（不写真实 SMC，不运行 CPU/GPU 负载）：
 

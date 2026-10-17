@@ -4,6 +4,10 @@ cd "$(dirname "$0")/.."
 BUILD="$PWD/build/macos"
 APP="$PWD/dist/BatteryTool.app"
 VERSION=$(awk -F '"' '/^version =/{print $2; exit}' pyproject.toml)
+# Python prerelease versions are mapped to numeric Apple bundle versions.
+APP_VERSION=$(printf '%s' "$VERSION" | sed -E 's/b[0-9]+$//')
+BUILD_VERSION=$(printf '%s' "$VERSION" | sed -nE 's/.*b([0-9]+)$/\1/p')
+BUILD_VERSION=${BUILD_VERSION:-1}
 if [[ "$(uname -m)" != "arm64" ]]; then
     echo "BatteryTool requires Apple Silicon (arm64)." >&2
     exit 1
@@ -25,11 +29,14 @@ cat > "$APP/Contents/Info.plist" <<PLIST
 <key>CFBundleIdentifier</key><string>local.batterytool.manager</string>
 <key>CFBundleName</key><string>BatteryTool</string>
 <key>CFBundlePackageType</key><string>APPL</string>
-<key>CFBundleShortVersionString</key><string>$VERSION</string>
-<key>CFBundleVersion</key><string>1</string>
+<key>CFBundleShortVersionString</key><string>$APP_VERSION</string>
+<key>CFBundleVersion</key><string>$BUILD_VERSION</string>
 <key>LSMinimumSystemVersion</key><string>15.0</string>
 <key>NSHighResolutionCapable</key><true/>
 </dict></plist>
 PLIST
+cp LICENSE THIRD_PARTY_NOTICES.md "$APP/Contents/Resources/"
+mkdir -p "$APP/Contents/Resources/LICENSES"
+cp LICENSES/*.txt "$APP/Contents/Resources/LICENSES/"
 codesign --force --deep --sign - "$APP"
 printf 'Built %s\n' "$APP"

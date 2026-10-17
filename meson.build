@@ -1,8 +1,8 @@
 project(
   'batterytool',
   'c',
-  version: '0.3.0',
-  license: 'Apache-2.0',
+  version: '0.4.0b1',
+  license: 'GPL-3.0-only',
   meson_version: '>=1.2.0',
   default_options: [
     'warning_level=2',

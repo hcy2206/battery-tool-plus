@@ -4,10 +4,10 @@ requires = [ "cffi>=2", "meson-python" ]
 
 [project]
 name = "battery-tool"
-version = "0.3.0"
+version = "0.4.0b1"
 description = "A command-line tool to monitor your battery health on macOS in a detrimental way"
 readme = "README.md"
-license = { text = "Apache-2.0" }
+license = { text = "GPL-3.0-only" }
 authors = [ { name = "Orest Tokovenko", email = "hi@oresttokovenko.com" } ]
 requires-python = ">=3.12,<3.13"
 classifiers = [

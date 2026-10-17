@@ -12,7 +12,7 @@ see the [README naming table](README.md#环境与命名).
 
 ## Commit messages
 
-This project uses [Conventional Commits](https://www.conventionalcommits.org/) and [Release Please](https://github.com/googleapis/release-please) to automate versioning and changelog generation.
+This project uses [Conventional Commits](https://www.conventionalcommits.org/) for commit history. Releases are versioned explicitly; see [RELEASING.md](RELEASING.md).
 
 Every commit to `main` must follow this format:
 
@@ -51,24 +51,14 @@ test: add cmocka test for SmcReadKey
 
 ## Fork release configuration
 
-The repository contains inherited Release Please and PyPI publishing workflows.
-Their presence does not mean that this fork is published on PyPI or has permission
-to publish the upstream `battery-tool` package.
+Releases distribute the native macOS application through GitHub only; no PyPI
+publishing workflow is retained. The manually dispatched `macOS Release` workflow
+builds an existing version tag and uploads the app, corresponding source and
+checksums to a draft pre-release. It uses the repository token, not a GitHub App.
 
-- `release.yaml` requires this fork's GitHub App configuration (`RELEASE_APP_ID`
-  and `RELEASE_APP_PRIVATE_KEY`) to create release PRs and releases.
-- `publish.yaml` currently refers to the upstream `battery-tool` PyPI project.
-  Before enabling publishing for the fork, choose an owned distribution name and
-  configure the corresponding PyPI trusted publisher and GitHub environment.
-- Once configured, Release Please proposes version/changelog changes. Publishing
-  is triggered by a **published GitHub release** or a manual workflow dispatch,
-  not simply by pushing a tag.
-- The native app is built separately with `scripts/build-macos.sh`. Its displayed
-  version comes from `pyproject.toml`; the local build is ad-hoc signed, not notarized.
-
-Do not describe upstream PyPI releases as Battery Tool Plus releases. Until a fork
-release channel is configured, document installation from this repository's source.
-Keep Python metadata, Meson version, lockfile and release notes aligned when releasing.
+See [RELEASING.md](RELEASING.md) for version mapping, local packaging and publishing.
+The combined application is GPL-3.0-only, with original upstream licenses and
+notices retained; see [THIRD_PARTY_NOTICES.md](THIRD_PARTY_NOTICES.md).
 
 ## Development
 
