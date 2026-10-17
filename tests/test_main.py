@@ -188,7 +188,7 @@ def test_cli_picks_tahoe_loop_when_chte_exists(hw):
     hw.set_keys(TAHOE_KEYS)
     hw.script(TARGET_ROW)
 
-    main(interval=0)
+    main(interval=1)
 
     assert hw.writes() == TAHOE_ENABLE
 
@@ -198,7 +198,7 @@ def test_cli_picks_legacy_loop_without_chte(hw):
     hw.set_keys(LEGACY_KEYS)
     hw.script(TARGET_ROW)
 
-    main(interval=0)
+    main(interval=1)
 
     assert hw.writes() == LEGACY_ENABLE
 
@@ -207,7 +207,11 @@ def test_cli_picks_legacy_loop_without_chte(hw):
 def test_cli_refuses_to_run_unplugged(hw, capfd):
     hw.script((50, 100, 100, 10, 0, 0))
 
-    main(interval=0)
+    from typer import Exit
+
+    with pytest.raises(Exit) as exc:
+        main(interval=1)
+    assert exc.value.exit_code == 1
 
     events = read_stderr_json(capfd)
     assert any(e["event"] == "charger_not_connected" for e in events)

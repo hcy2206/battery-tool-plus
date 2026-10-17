@@ -71,35 +71,70 @@ def is_tahoe() -> bool:
     return lib.SmcReadKey(SMCKeys.CHARGING_CONTROL_TE, buf, 32) == 0
 
 
+class BatteryControlError(RuntimeError):
+    """One or more SMC writes failed."""
+
+
+def _write_keys(writes: tuple[tuple[SMCKeys, SMCValues], ...], *, best_effort: bool = False) -> None:
+    failed: list[str] = []
+    for key, value in writes:
+        if lib.SmcWriteKey(key, value) != 0:
+            failed.append(key.decode())
+            if not best_effort:
+                break
+    if failed:
+        raise BatteryControlError(f"Failed to write SMC keys: {', '.join(failed)}")
+
+
 # Legacy (pre-macOS 15.7)
 
 
 def legacy_disable_charging() -> None:
     """Disable charging and force discharge via CH0B/CH0C/CH0I"""
-    lib.SmcWriteKey(SMCKeys.CHARGING_CONTROL_B, SMCValues.DISABLE_CHARGING)
-    lib.SmcWriteKey(SMCKeys.CHARGING_CONTROL_C, SMCValues.DISABLE_CHARGING)
-    lib.SmcWriteKey(SMCKeys.DISCHARGE_CONTROL_I, SMCValues.ENABLE_DISCHARGE)
+    _write_keys(
+        (
+            (SMCKeys.CHARGING_CONTROL_B, SMCValues.DISABLE_CHARGING),
+            (SMCKeys.CHARGING_CONTROL_C, SMCValues.DISABLE_CHARGING),
+            (SMCKeys.DISCHARGE_CONTROL_I, SMCValues.ENABLE_DISCHARGE),
+        )
+    )
 
 
 def legacy_enable_charging() -> None:
-    """Re-enable charging and stop forced discharge via CH0B/CH0C/CH0I"""
-    lib.SmcWriteKey(SMCKeys.CHARGING_CONTROL_B, SMCValues.ENABLE_CHARGING)
-    lib.SmcWriteKey(SMCKeys.CHARGING_CONTROL_C, SMCValues.ENABLE_CHARGING)
-    lib.SmcWriteKey(SMCKeys.DISCHARGE_CONTROL_I, SMCValues.DISABLE_DISCHARGE)
+    """Attempt every restoration write, even if an earlier write fails."""
+    _write_keys(
+        (
+            (SMCKeys.CHARGING_CONTROL_B, SMCValues.ENABLE_CHARGING),
+            (SMCKeys.CHARGING_CONTROL_C, SMCValues.ENABLE_CHARGING),
+            (SMCKeys.DISCHARGE_CONTROL_I, SMCValues.DISABLE_DISCHARGE),
+        ),
+        best_effort=True,
+    )
 
 
-# Tahoe (macOS 15.7+)
+def _tahoe_set_charging(*, enabled: bool) -> None:
+    charging = SMCValues.TAHOE_ENABLE_CHARGING if enabled else SMCValues.TAHOE_DISABLE_CHARGING
+    discharge = SMCValues.TAHOE_DISABLE_DISCHARGE if enabled else SMCValues.TAHOE_ENABLE_DISCHARGE
+    fallback = SMCValues.TAHOE_FALLBACK_DISABLE_DISCHARGE if enabled else SMCValues.TAHOE_FALLBACK_ENABLE_DISCHARGE
+    failed: list[str] = []
+    if lib.SmcWriteKey(SMCKeys.CHARGING_CONTROL_TE, charging) != 0:
+        failed.append("CHTE")
+        if not enabled:
+            raise BatteryControlError("Failed to write SMC key: CHTE")
+    if (
+        lib.SmcWriteKey(SMCKeys.DISCHARGE_CONTROL_IE, discharge) != 0
+        and lib.SmcWriteKey(SMCKeys.DISCHARGE_CONTROL_J, fallback) != 0
+    ):
+        failed.append("CHIE/CH0J")
+    if failed:
+        raise BatteryControlError(f"Failed to write SMC keys: {', '.join(failed)}")
 
 
 def tahoe_disable_charging() -> None:
-    """Disable charging and force discharge via CHTE/CHIE, falls back to CH0J"""
-    lib.SmcWriteKey(SMCKeys.CHARGING_CONTROL_TE, SMCValues.TAHOE_DISABLE_CHARGING)
-    if lib.SmcWriteKey(SMCKeys.DISCHARGE_CONTROL_IE, SMCValues.TAHOE_ENABLE_DISCHARGE) != 0:
-        lib.SmcWriteKey(SMCKeys.DISCHARGE_CONTROL_J, SMCValues.TAHOE_FALLBACK_ENABLE_DISCHARGE)
+    """Disable charging and force discharge, with CH0J fallback."""
+    _tahoe_set_charging(enabled=False)
 
 
 def tahoe_enable_charging() -> None:
-    """Re-enable charging and stop forced discharge via CHTE/CHIE, falls back to CH0J"""
-    lib.SmcWriteKey(SMCKeys.CHARGING_CONTROL_TE, SMCValues.TAHOE_ENABLE_CHARGING)
-    if lib.SmcWriteKey(SMCKeys.DISCHARGE_CONTROL_IE, SMCValues.TAHOE_DISABLE_DISCHARGE) != 0:
-        lib.SmcWriteKey(SMCKeys.DISCHARGE_CONTROL_J, SMCValues.TAHOE_FALLBACK_DISABLE_DISCHARGE)
+    """Attempt both charging and discharge restoration, with CH0J fallback."""
+    _tahoe_set_charging(enabled=True)

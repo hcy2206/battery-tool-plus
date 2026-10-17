@@ -62,6 +62,8 @@ def pytest_collection_modifyitems(items):
 def _reset_logging():
     """Reset logging state between tests to prevent handler accumulation"""
     yield
-    root = logging.getLogger()
-    root.handlers.clear()
+    root = logging.getLogger("batterytool")
+    for handler in root.handlers[:]:
+        root.removeHandler(handler)
+        handler.close()
     structlog.reset_defaults()

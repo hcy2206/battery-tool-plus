@@ -35,7 +35,9 @@ jobs:
         uses: astral-sh/setup-uv@v5
 
       - name: Install dependencies
-        run: uv sync --all-groups
+        run: |
+          uv sync --all-groups --no-install-project
+          uv sync --all-groups
 
       - name: Run lint
         run: uv run nox -s lint
@@ -66,7 +68,7 @@ jobs:
       # /usr/bin explicitly: install-llvm-action puts its clang first on PATH,
       # and meson.build requires Apple Clang
       - name: Build wheel
-        run: uv build --wheel
+        run: uv build --no-config --wheel
         env:
           CC: /usr/bin/clang
           CXX: /usr/bin/clang++

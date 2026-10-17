@@ -19,12 +19,14 @@ dependencies = [
   "structlog>=25.5",
   "typer>=0.23",
 ]
-scripts.battery-tool = "batterytool.main:main"
+scripts.battery-tool = "batterytool.main:app"
 
 [dependency-groups]
 dev = [
   "basedpyright>=1.38",
   "meson>=1.2",
+  "meson-python",
+  "ninja",
   "nox>=2026.2.9",
   "pyproject-fmt>=2.16",
   "pytest>=8.3.4",
@@ -33,7 +35,7 @@ dev = [
 ]
 
 [tool.ruff]
-target-version = "py310"
+target-version = "py312"
 line-length = 120
 exclude = [ "noxfile.py", "tests/**" ]
 format.quote-style = "double"
@@ -93,3 +95,6 @@ pythonVersion = "3.12"
 include = [ "src/batterytool/**" ]
 typeCheckingMode = "strict"
 failOnWarnings = false
+
+[tool.uv]
+no-build-isolation-package = [ "battery-tool" ]

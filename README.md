@@ -48,3 +48,19 @@ sudo uvx battery-tool
 - [battery.sh](https://github.com/actuallymentor/battery/blob/main/battery.sh) by [Actually Mentor](https://github.com/actuallymentor) -- the battery management logic started here
 - [smc-command](https://github.com/hholtmann/smcFanControl/tree/master/smc-command) by [hholtmann](https://github.com/hholtmann) -- for talking to the SMC
 - [bclm](https://github.com/zackelia/bclm) -- for figuring out which SMC keys control charging
+
+#### Runtime behavior
+
+Options require `0 <= target-health <= 100`, `1 <= min-charge < max-charge <= 100`,
+and an interval of at least one second. Charge thresholds are inclusive.
+On the first cycle reading, the tool explicitly selects charging or discharging
+instead of assuming the SMC is already in the expected state.
+
+If the charger is disconnected during cycling, battery data becomes invalid,
+or an SMC write fails, cycling stops and charging restoration is attempted.
+Restoration attempts all applicable controls even if one fails. Failures return
+exit code 1 and are recorded in JSON logs; invalid CLI options return exit code 2.
+Ctrl+C also attempts restoration. Forced process termination or power loss cannot
+run this cleanup, and a failed restoration is reported as `cleanup_failed`.
+
+`--status` only reads battery data and works without the charger connected.

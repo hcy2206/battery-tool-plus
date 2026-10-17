@@ -173,7 +173,7 @@ void printPWM(SMCVal_t val) {
 }
 
 void printBytesHex(SMCVal_t val) {
-  int i;
+  UInt32 i;
 
   printf("(bytes");
   for (i = 0; i < val.dataSize; i++)
@@ -342,7 +342,7 @@ kern_return_t SMCReadKey2(UInt32Char_t key, SMCVal_t *val, io_connect_t conn) {
   memset(val, 0, sizeof(SMCVal_t));
 
   inputStructure.key = _strtoul(key, 4, 16);
-  sprintf(val->key, key);
+  snprintf(val->key, sizeof(val->key), "%s", key);
 
   result = SMCGetKeyInfo(inputStructure.key, &outputStructure.keyInfo, conn);
   if (result != kIOReturnSuccess) {

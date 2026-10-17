@@ -10,8 +10,8 @@ DEV_DEPS = nox.project.dependency_groups(PYPROJECT, "dev")
 
 @nox.session(python=PYTHON_VERSIONS)
 def tests(session):
+    session.install(*CORE_DEPS, *DEV_DEPS)
     session.install(".")
-    session.install(*DEV_DEPS)
     session.run("python", "-m", "pytest", *session.posargs)
 
 

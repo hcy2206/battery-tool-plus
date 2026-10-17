@@ -80,6 +80,7 @@ clean:
 
 [doc("Install the package in development mode")]
 install:
+    uv sync --all-groups --no-install-project
     uv sync --all-groups
 
 # ==================== Combined Recipes ====================

@@ -7,6 +7,7 @@
 
 #include "smc_wrapper.h"
 
+#include <ctype.h>
 #include <stdio.h>
 #include <stdlib.h>
 #include <string.h>
@@ -14,9 +15,15 @@
 #include "smc.h"
 
 int SmcReadKey(const char* key, char* value, int value_size) {
+  if (key == NULL || strlen(key) != 4 || value == NULL) {
+    return -1;
+  }
   io_connect_t conn;
   kern_return_t result;
   SMCVal_t val;
+  if (value_size <= 0) {
+    return -1;
+  }
 
   result = SMCOpen(&conn);
   if (result != kIOReturnSuccess) {
@@ -34,6 +41,9 @@ int SmcReadKey(const char* key, char* value, int value_size) {
     return -1;
   }
 
+  if (val.dataSize > sizeof(val.bytes)) {
+    return -1;
+  }
   int copy_size = (int)val.dataSize;
   if (copy_size > value_size) {
     copy_size = value_size;
@@ -44,11 +54,24 @@ int SmcReadKey(const char* key, char* value, int value_size) {
 }
 
 int SmcWriteKey(const char* key, const char* value) {
+  if (key == NULL || strlen(key) != 4 || value == NULL) {
+    return -1;
+  }
   io_connect_t conn;
   kern_return_t result;
   SMCVal_t read_val;
   SMCKeyData_t input_structure;
   SMCKeyData_t output_structure;
+  size_t hex_len = strlen(value);
+  if (hex_len == 0 || hex_len % 2 != 0 ||
+      hex_len / 2 > sizeof(read_val.bytes)) {
+    return -1;
+  }
+  for (size_t i = 0; i < hex_len; i++) {
+    if (!isxdigit((unsigned char)value[i])) {
+      return -1;
+    }
+  }
 
   result = SMCOpen(&conn);
   if (result != kIOReturnSuccess) {
@@ -70,7 +93,6 @@ int SmcWriteKey(const char* key, const char* value) {
   strncpy(write_val.key, smc_key, sizeof(write_val.key));
   write_val.key[sizeof(write_val.key) - 1] = '\0';
 
-  size_t hex_len = strlen(value);
   write_val.dataSize = (UInt32)(hex_len / 2);
   if (write_val.dataSize != read_val.dataSize) {
     SMCClose(conn);

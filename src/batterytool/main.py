@@ -16,25 +16,35 @@ app = typer.Typer(help="BatteryTool - Cycle your MacBook battery for warranty re
 
 @app.command()
 def main(
-    target_health: Annotated[int, typer.Option("--target-health", help="Target battery health %")] = 79,
-    max_charge: Annotated[int, typer.Option("--max-charge", help="Max charge threshold %")] = 95,
-    min_charge: Annotated[int, typer.Option("--min-charge", help="Min charge threshold %")] = 5,
-    interval: Annotated[int, typer.Option("--interval", help="Polling interval in seconds")] = 60,
+    target_health: Annotated[int, typer.Option("--target-health", help="Target battery health %", min=0, max=100)] = 79,
+    max_charge: Annotated[int, typer.Option("--max-charge", help="Max charge threshold %", min=1, max=100)] = 95,
+    min_charge: Annotated[int, typer.Option("--min-charge", help="Min charge threshold %", min=1, max=99)] = 5,
+    interval: Annotated[int, typer.Option("--interval", help="Polling interval in seconds", min=1)] = 60,
     log_file: Annotated[Path | None, typer.Option("--log-file", help="Save logs to file")] = None,
     status: Annotated[bool, typer.Option("--status", help="Show battery status and exit")] = False,
 ) -> None:
     """BatteryTool - Cycle your MacBook battery for warranty replacement"""
-    logger = setup_logging(log_file)
+    if not 0 <= target_health <= 100:
+        raise typer.BadParameter("must be between 0 and 100", param_hint="--target-health")
+    if not 1 <= min_charge < max_charge <= 100:
+        raise typer.BadParameter("require 1 <= min-charge < max-charge <= 100")
+    if interval < 1:
+        raise typer.BadParameter("must be at least 1 second", param_hint="--interval")
+    try:
+        logger = setup_logging(log_file)
+    except OSError as exc:
+        typer.echo(f"Cannot open log file: {exc}", err=True)
+        raise typer.Exit(1) from exc
 
     if not is_apple_silicon():
         logger.error("unsupported", message="Only Apple Silicon Macs are supported")
-        return
+        raise typer.Exit(1)
 
     battery_info: BatteryInfo = fetch_battery_info()
 
     if battery_info.max_capacity <= 0 or battery_info.design_capacity <= 0:
         logger.error("invalid_battery_data", message="Failed to read valid battery capacity from IOKit")
-        return
+        raise typer.Exit(1)
 
     battery_percentage = battery_info.current_capacity / battery_info.max_capacity * 100
     battery_health = battery_info.max_capacity / battery_info.design_capacity * 100
@@ -56,12 +66,15 @@ def main(
     # Check if adapter is connected before proceeding
     if not battery_info.is_plugged_in:
         logger.error("charger_not_connected", message="Charger not connected. Exiting...")
-        return
+        raise typer.Exit(1)
 
     if is_tahoe():
-        tahoe_loop(target_health, max_charge, min_charge, interval, logger)
+        success = tahoe_loop(target_health, max_charge, min_charge, interval, logger)
     else:
-        legacy_loop(target_health, max_charge, min_charge, interval, logger)
+        success = legacy_loop(target_health, max_charge, min_charge, interval, logger)
+
+    if not success:
+        raise typer.Exit(1)
 
 
 if __name__ == "__main__":

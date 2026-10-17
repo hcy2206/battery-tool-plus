@@ -53,15 +53,23 @@ Only `feat` and `fix` commits trigger a release. Types like `docs`, `ci`, `test`
 ### Prerequisites
 
 - macOS (Apple Silicon)
-- Python 3.12+
+- Python 3.12
 - [uv](https://docs.astral.sh/uv/)
 - [just](https://github.com/casey/just)
 
 ### Setup
 
 ```bash
+uv sync --all-groups --no-install-project
 uv sync --all-groups
 ```
+
+The first sync installs Meson, meson-python and Ninja into the project environment.
+The second builds the editable package without isolation, so later imports can
+rebuild against tools that still exist rather than a deleted temporary environment.
+
+For a release wheel, use `uv build --no-config --wheel` to build in isolation
+without the development-only uv settings.
 
 ### Running checks
 
