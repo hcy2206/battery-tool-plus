@@ -1,4 +1,35 @@
-# Changelog
+# Battery Tool Plus Changelog
+
+Repository: [hcy2206/battery-tool-plus](https://github.com/hcy2206/battery-tool-plus).
+This project is a fork of [BatteryTool](https://github.com/oresttokovenko/battery-tool).
+
+## Unreleased — Battery Tool Plus
+
+### Added
+
+- Native SwiftUI management window and menu bar controls.
+- CPU and Metal GPU load during both charging and discharging, with activity pauses and thermal protection.
+- Ready-to-leave, daily cycling and timed-load modes, with separate desktop-work and departure deadlines.
+- Local SQLite history, initial idle windows, history-based recommendations and charging-time estimates.
+- Native policy, controller, IPC, worker-lifetime and view-rendering checks.
+
+### Fixed
+
+- CLI argument parsing, threshold validation, error exit codes and SMC failure handling.
+- Charging restoration, charger-disconnection handling, duplicate logging and C input validation.
+- Editable-build dependencies and coordination between CLI and native power control.
+
+### Documentation
+
+- Adopt the Battery Tool Plus project name and fork repository links.
+- Document source installation rather than directing fork users to the upstream PyPI package.
+- Document native management, development setup and inherited release configuration.
+
+## Upstream history
+
+The entries below describe releases of the original BatteryTool project. Their
+version dates, authorship context, comparison URLs and commit links are preserved
+as upstream history; they are not releases published by Battery Tool Plus.
 
 ## [0.3.0](https://github.com/oresttokovenko/battery-tool/compare/v0.2.4...v0.3.0) (2026-08-17)
 

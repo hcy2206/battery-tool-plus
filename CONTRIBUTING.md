@@ -1,4 +1,14 @@
-# Contributing
+# Contributing to Battery Tool Plus
+
+This guide applies to [hcy2206/battery-tool-plus](https://github.com/hcy2206/battery-tool-plus),
+a fork of [Orest Tokovenko's BatteryTool](https://github.com/oresttokovenko/battery-tool).
+Open issues and pull requests against the fork. Preserve upstream attribution,
+third-party license notices, and historical changelog links.
+
+The public project name is **Battery Tool Plus**. The Python distribution and CLI
+remain `battery-tool`, the module remains `batterytool`, and the native artifact
+remains `BatteryTool.app`. Use these actual identifiers in commands and paths;
+see the [README naming table](README.md#环境与命名).
 
 ## Commit messages
 
@@ -39,20 +49,33 @@ refactor: extract battery info fetch into wrapper function
 test: add cmocka test for SmcReadKey
 ```
 
-## How releases work
+## Fork release configuration
 
-1. You merge PRs into `main` with conventional commit messages
-2. Release Please automatically opens a "Release PR" that bumps the version in `pyproject.toml` and updates the changelog
-3. When you merge the Release PR, a git tag (`v0.3.0`, etc.) is created
-4. The tag triggers the publish workflow which builds the wheel and publishes to PyPI
+The repository contains inherited Release Please and PyPI publishing workflows.
+Their presence does not mean that this fork is published on PyPI or has permission
+to publish the upstream `battery-tool` package.
 
-Only `feat` and `fix` commits trigger a release. Types like `docs`, `ci`, `test`, and `chore` are included in the changelog but don't create a new release on their own.
+- `release.yaml` requires this fork's GitHub App configuration (`RELEASE_APP_ID`
+  and `RELEASE_APP_PRIVATE_KEY`) to create release PRs and releases.
+- `publish.yaml` currently refers to the upstream `battery-tool` PyPI project.
+  Before enabling publishing for the fork, choose an owned distribution name and
+  configure the corresponding PyPI trusted publisher and GitHub environment.
+- Once configured, Release Please proposes version/changelog changes. Publishing
+  is triggered by a **published GitHub release** or a manual workflow dispatch,
+  not simply by pushing a tag.
+- The native app is built separately with `scripts/build-macos.sh`. Its displayed
+  version comes from `pyproject.toml`; the local build is ad-hoc signed, not notarized.
+
+Do not describe upstream PyPI releases as Battery Tool Plus releases. Until a fork
+release channel is configured, document installation from this repository's source.
+Keep Python metadata, Meson version, lockfile and release notes aligned when releasing.
 
 ## Development
 
 ### Prerequisites
 
-- macOS (Apple Silicon)
+- macOS 15 or newer (Apple Silicon)
+- Xcode Command Line Tools (Swift, Clang, macOS SDK)
 - Python 3.12
 - [uv](https://docs.astral.sh/uv/)
 - [just](https://github.com/casey/just)
@@ -60,6 +83,8 @@ Only `feat` and `fix` commits trigger a release. Types like `docs`, `ci`, `test`
 ### Setup
 
 ```bash
+git clone https://github.com/hcy2206/battery-tool-plus.git
+cd battery-tool-plus
 uv sync --all-groups --no-install-project
 uv sync --all-groups
 ```
@@ -81,6 +106,22 @@ just python-check    # Format check + lint + typecheck
 just check           # All checks
 ```
 
+### Native macOS manager
+
+```bash
+just macos-build         # Build dist/BatteryTool.app
+just macos-test          # Pure policy, prediction and SQLite checks
+just macos-integration   # Demo controller/IPC/worker-lifetime checks and view renders
+just macos-demo          # Open the app without real battery writes or compute load
+uv run pytest           # Python regressions, including the shared controller lock
+```
+
+The native app uses SwiftUI, Metal and SQLite, reusing the C battery layer. The
+Python CLI remains available. Both controllers use the same exclusive lock so they
+cannot issue competing real SMC writes. Native tests use demo data and temporary
+file-backed power actions; actual hardware cycling is a separate manual validation.
+See [the native manager guide](macos/README.md) for architecture and behavior.
+
 ### C code
 
 C sources live in `c/`. The third-party `smc.c`/`smc.h` are excluded from formatting and linting. All other C files are checked by `clang-format` and `clang-tidy`.
@@ -89,7 +130,7 @@ Hardware-dependent C tests (those that talk to the SMC or IOKit) are tagged with
 
 ## Testing against the fake backend
 
-Tests never touch real hardware and never use mocks. Instead, the package is built with **two** extension modules exposing the same API:
+The Python battery regression tests use a file-backed fake instead of real hardware. The package is built with **two** extension modules exposing the same API:
 
 - `iokit_wrapper`: the real one, talks to IOKit/SMC
 - `iokit_wrapper_fake`: file-backed fakes (`c/smc_fake.c`, `c/power_sources_fake.c`)
@@ -128,4 +169,4 @@ Custom pytest marks (e.g. `apple_silicon`) are registered in `pyproject.toml` an
 
 ### Writing a C test
 
-The fake itself is tested in `c/tests/test_smc_fake.c` with cmocka. Each test gets a fresh fake dir via the `FAKE_TEST(...)` macro (per-test setup/teardown). These tests carry no `hardware` suite tag, so they run everywhere, including CI.
+The fake itself is tested in `c/tests/test_smc_fake.c` with cmocka. Each test gets a fresh fake dir via the `FAKE_TEST(...)` macro (per-test setup/teardown). These tests carry no `hardware` suite tag, so they run without SMC access on supported macOS build hosts, including CI.

@@ -72,3 +72,12 @@ jobs:
         env:
           CC: /usr/bin/clang
           CXX: /usr/bin/clang++
+
+  native-macos:
+    runs-on: macos-latest
+    steps:
+      - uses: actions/checkout@v4
+      - name: Test native policy and history
+        run: ./scripts/test-macos.sh
+      - name: Build native management app
+        run: ./scripts/build-macos.sh

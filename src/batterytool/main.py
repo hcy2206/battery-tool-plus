@@ -4,6 +4,7 @@ from typing import TYPE_CHECKING, Annotated
 import typer
 
 from batterytool.battery import fetch_battery_info, is_apple_silicon, is_tahoe
+from batterytool.locking import hardware_lock
 from batterytool.logging import setup_logging
 from batterytool.loop import legacy_loop, tahoe_loop
 
@@ -68,10 +69,15 @@ def main(
         logger.error("charger_not_connected", message="Charger not connected. Exiting...")
         raise typer.Exit(1)
 
-    if is_tahoe():
-        success = tahoe_loop(target_health, max_charge, min_charge, interval, logger)
-    else:
-        success = legacy_loop(target_health, max_charge, min_charge, interval, logger)
+    try:
+        with hardware_lock():
+            if is_tahoe():
+                success = tahoe_loop(target_health, max_charge, min_charge, interval, logger)
+            else:
+                success = legacy_loop(target_health, max_charge, min_charge, interval, logger)
+    except (OSError, RuntimeError) as exc:
+        logger.error("controller_unavailable", error=str(exc))
+        raise typer.Exit(1) from exc
 
     if not success:
         raise typer.Exit(1)

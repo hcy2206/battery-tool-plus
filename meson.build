@@ -25,6 +25,7 @@ py.install_sources(
   'src/batterytool/battery.py',
   'src/batterytool/constants.py',
   'src/batterytool/logging.py',
+  'src/batterytool/locking.py',
   'src/batterytool/loop.py',
   'src/batterytool/main.py',
   subdir: 'batterytool',

@@ -93,3 +93,21 @@ format: python-format c-format
 
 [doc("Run all checks and build")]
 all: check build
+
+# ==================== Native macOS Manager ====================
+
+[doc("Build the native macOS management app")]
+macos-build:
+    ./scripts/build-macos.sh
+
+[doc("Run native policy and prediction tests without hardware access")]
+macos-test:
+    ./scripts/test-macos.sh
+
+[doc("Run demo controller checks and render the four management views")]
+macos-integration:
+    ./scripts/test-macos-integration.sh
+
+[doc("Open the native app in demo mode (no battery writes or load)")]
+macos-demo: macos-build
+    open dist/BatteryTool.app --args --demo

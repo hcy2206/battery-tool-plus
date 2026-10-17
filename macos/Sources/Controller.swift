@@ -1,0 +1,274 @@
+import AppKit
+import Combine
+import CoreGraphics
+import IOKit.pwr_mgt
+
+@MainActor final class Controller: ObservableObject {
+    @Published var settings = Settings()
+    @Published var mode = Mode.system
+    @Published var reading = Reading(percent: 0, health: 100, plugged: false, charging: false, cycles: 0)
+    @Published var reason = "正在读取电池状态"
+    @Published var errorMessage: String?
+    @Published var warning = ""
+    @Published var cpuLoad = 0.0
+    @Published var gpuLoad = 0.0
+    @Published var thermal = 0
+    @Published var plan: Plan?
+    @Published var authorized = false
+    @Published var authorizing = false
+    @Published var paused = false
+    @Published var recommendation: Recommendation?
+    @Published var events = [String]()
+    @Published var graph = [Observation]()
+    @Published var reserveMinutes = 120.0
+    @Published var reserveReason = "充电样本不足"
+    @Published var idleSeconds = 0.0
+    let demo: Bool
+    private let hardware = HardwareClient()
+    private let load = LoadManager()
+    private var history: History?
+    private var timer: Timer?
+    private var observers = [NSObjectProtocol]()
+    private var runtimeSettings = Settings()
+    private var charging = true
+    private var appliedCharging: Bool?
+    private var lastTick = Date()
+    private var lastSample = Date.distantPast
+    private var sampleRefresh = Date.distantPast
+    private var chargeSamples = [Observation]()
+    private var lastPlanEvent = ""
+    private var pendingCharge: (Date, Double)?
+    private var assertion: IOPMAssertionID = 0
+    private var asserting = false
+    private var sleeping = false
+    private var startGrace = Date.distantPast
+    private var thermalHoldUntil = Date.distantPast
+    private var controllerLock: Int32 = -1
+    private let settingsURL: URL
+
+    init(demo: Bool, storageDirectory: URL? = nil, startTimer: Bool = true) {
+        self.demo = demo
+        let base = storageDirectory ?? FileManager.default.urls(for: .applicationSupportDirectory, in: .userDomainMask)[0]
+            .appendingPathComponent(demo ? "BatteryTool-Demo" : "BatteryTool")
+        settingsURL = base.appendingPathComponent("settings.json")
+        do {
+            history = try History(directory: base)
+            controllerLock = open(base.appendingPathComponent("controller.lock").path, O_CREAT | O_RDWR | O_NOFOLLOW, 0o600)
+            guard controllerLock >= 0, flock(controllerLock, LOCK_EX | LOCK_NB) == 0 else {
+                if controllerLock >= 0 { close(controllerLock); controllerLock = -1 }
+                throw AppError.message("已有一个管理窗口进程正在运行")
+            }
+            if let data = try? Data(contentsOf: settingsURL), let saved = try? JSONDecoder().decode(Settings.self, from: data) {
+                try saved.validate(); settings = saved
+            }
+        } catch { errorMessage = error.localizedDescription }
+        runtimeSettings = settings
+        if demo { authorized = true; settings.pauseOnActivity = false }
+        let center = NSWorkspace.shared.notificationCenter
+        observers.append(center.addObserver(forName: NSWorkspace.willSleepNotification, object: nil, queue: .main) { [weak self] _ in
+            MainActor.assumeIsolated { self?.sleep() }
+        })
+        observers.append(center.addObserver(forName: NSWorkspace.didWakeNotification, object: nil, queue: .main) { [weak self] _ in
+            MainActor.assumeIsolated {
+                self?.sleeping = false
+                self?.startGrace = Date().addingTimeInterval(30)
+                self?.appliedCharging = nil
+                self?.tick()
+            }
+        })
+        tick()
+        refreshHistory()
+        recommend()
+        if startTimer {
+            timer = Timer.scheduledTimer(withTimeInterval: 2, repeats: true) { [weak self] _ in
+                MainActor.assumeIsolated { self?.tick() }
+            }
+        }
+    }
+    func saveSettings() -> Bool {
+        guard controllerLock >= 0 else { return false }
+        do {
+            try settings.validate()
+            try JSONEncoder().encode(settings).write(to: settingsURL, options: .atomic)
+            return true
+        } catch { errorMessage = error.localizedDescription; return false }
+    }
+    func authorize() {
+        guard !demo, !authorizing, controllerLock >= 0 else { return }
+        authorizing = true
+        hardware.authorize { [weak self] message in
+            guard let self else { return }
+            self.authorizing = false
+            self.authorized = message == nil
+            if let message { self.errorMessage = message }
+            self.tick()
+        }
+    }
+    func switchMode(_ selected: Mode) {
+        // Stopping must work even while the settings form contains invalid edits.
+        if selected == .daily {
+            guard saveSettings() else { return }
+            runtimeSettings = settings
+        }
+        guard selected == .system || (authorized && controllerLock >= 0) else {
+            errorMessage = "请先点击「授权电池控制」，完成一次管理员授权。"; return
+        }
+        load.stop(); cpuLoad = 0; gpuLoad = 0
+        mode = selected; plan = nil; paused = false
+        appliedCharging = nil
+        event("切换模式：\(selected.title)")
+        tick()
+    }
+    @discardableResult func start(plan: Plan) -> Bool {
+        guard saveSettings() else { return false }
+        guard authorized && controllerLock >= 0 else { errorMessage = "请先授权电池控制"; return false }
+        guard plan.deadline > Date(), plan.start < plan.deadline,
+              plan.deadline.timeIntervalSince(Date()) <= 24*3600 else {
+            errorMessage = "任务截止必须晚于开始时间，目标时间必须在未来 24 小时内。"; return false
+        }
+        guard settings.cpu > 0 || settings.gpu > 0 else { errorMessage = "请至少启用一种负载"; return false }
+        runtimeSettings = settings
+        load.stop(); self.plan = plan; mode = .timed; paused = false
+        appliedCharging = nil
+        // Require a full idle interval after starting before launching load.
+        startGrace = Date().addingTimeInterval(settings.idleSeconds)
+        event("确认定时压测：\(plan.goal.title)，截止 \(plan.deadline.formatted())")
+        tick()
+        return mode == .timed || mode == .ready
+    }
+    func togglePause() { paused.toggle(); event(paused ? "手动暂停负载" : "恢复负载"); tick() }
+    func recommend() {
+        guard saveSettings() else { return }
+        recommendation = Predictor.recommend(now: Date(), settings: settings,
+                                             samples: history?.samples(since: Date().addingTimeInterval(-28*86400)) ?? [])
+    }
+    func event(_ text: String) {
+        // Task/control events are stored regardless of activity-learning consent.
+        do { try history?.event(text) } catch { errorMessage = error.localizedDescription }
+        events = history?.events() ?? []
+    }
+    func reserveEstimate(for settings: Settings) -> (Double, String) {
+        Predictor.chargeReserve(samples: chargeSamples, percent: reading.percent,
+                                target: settings.departureCharge, fallback: settings.chargeReserveMinutes)
+    }
+    func refreshHistory() {
+        events = history?.events() ?? []
+        graph = history?.samples(since: Date().addingTimeInterval(-24*3600)) ?? []
+        chargeSamples = history?.samples(since: Date().addingTimeInterval(-7*86400)) ?? []
+        sampleRefresh = Date()
+    }
+    func clearHistory() {
+        do { try history?.clear(); refreshHistory(); recommend() }
+        catch { errorMessage = error.localizedDescription }
+    }
+    private func setAssertion(_ active: Bool) {
+        if active && !asserting {
+            asserting = IOPMAssertionCreateWithName(kIOPMAssertionTypePreventUserIdleSystemSleep as CFString,
+                                                   IOPMAssertionLevel(kIOPMAssertionLevelOn),
+                                                   "BatteryTool approved timed session" as CFString, &assertion) == kIOReturnSuccess
+        } else if !active && asserting {
+            IOPMAssertionRelease(assertion); asserting = false
+        }
+    }
+    private func sleep() {
+        sleeping = true
+        load.stop(); cpuLoad = 0; gpuLoad = 0
+        setAssertion(false)
+        if authorized && !demo {
+            do { try hardware.request("charge"); appliedCharging = true }
+            catch { errorMessage = "睡眠前恢复失败：\(error.localizedDescription)" }
+        }
+        event("系统睡眠：停止负载，唤醒后重新检查任务截止时间")
+    }
+    func tick() {
+        guard !sleeping, controllerLock >= 0 else { return }
+        let now = Date()
+        let observationGap = now.timeIntervalSince(lastTick)
+        lastTick = now
+        if observationGap > 10 {
+            // Never infer user idleness across a sleep, clock jump, or controller stall.
+            startGrace = now.addingTimeInterval(settings.idleSeconds)
+            load.stop()
+        }
+        // kCGAnyInputEventType is the documented all-input sentinel.
+        idleSeconds = CGEventSource.secondsSinceLastEventType(.combinedSessionState, eventType: CGEventType(rawValue: ~UInt32(0))!)
+        if demo { idleSeconds = 600 }
+        thermal = demo ? 0 : ProcessInfo.processInfo.thermalState.rawValue
+        if thermal >= 2 { thermalHoldUntil = now.addingTimeInterval(60) }
+        reading = demo ? Reading(percent: 64, health: 91, plugged: true, charging: charging, cycles: 182) : batteryReading()
+        do {
+            let settings = runtimeSettings
+            try settings.validate()
+            if authorized && !demo { try hardware.request("ping") }
+            if now.timeIntervalSince(sampleRefresh) >= 60 { refreshHistory() }
+            let reserve = reserveEstimate(for: settings)
+            reserveMinutes = reserve.0 / 60; reserveReason = reserve.1
+            let effectiveIdle = now < startGrace ? 0 : idleSeconds
+            let decision = Policy.decide(mode: mode, plan: plan, settings: settings, reading: reading, now: now,
+                                         charging: charging, idle: effectiveIdle, thermal: now < thermalHoldUntil ? max(2, thermal) : thermal,
+                                         reserve: reserve.0, paused: paused)
+            if decision.mode != mode {
+                event("任务转换：\(decision.reason)")
+                mode = decision.mode
+                if mode != .timed { plan = nil }
+            }
+            reason = decision.reason
+            charging = decision.charging
+            if authorized && appliedCharging != charging {
+                if !demo { try hardware.request(charging ? "charge" : "discharge") }
+                appliedCharging = charging
+            }
+            let scale = authorized ? decision.load : 0
+            if !demo { try load.update(cpu: settings.cpu * scale, gpu: settings.gpu * scale, threads: settings.threads) }
+            cpuLoad = settings.cpu * scale; gpuLoad = settings.gpu * scale
+            setAssertion(mode == .timed && plan.map { now < $0.deadline } == true && !demo)
+            warning = ""
+            if mode == .timed && charging && reading.percent < settings.maximum {
+                if pendingCharge == nil { pendingCharge = (now, reading.percent) }
+                if let began = pendingCharge, now.timeIntervalSince(began.0) >= 600 {
+                    if reading.percent <= began.1 + 0.5 { warning = "已允许充电，但十分钟内电量未明显上升。负载可能超过充电余量。" }
+                    else { pendingCharge = (now, reading.percent) }
+                }
+            } else { pendingCharge = nil }
+            if mode == .ready && reading.percent < settings.departureCharge {
+                warning = "正在允许正常充电，实际完成时间由系统与适配器决定。"
+            }
+            if self.settings.recordHistory && reading.valid && observationGap <= 10 && now.timeIntervalSince(lastSample) >= 30 {
+                // Genuine idle input is recorded; heat pauses and load state are not labels for user activity.
+                try history?.add(Observation(time: now, idle: idleSeconds >= settings.idleSeconds,
+                                             percent: reading.percent, charging: reading.charging, load: scale > 0))
+                lastSample = now
+                refreshHistory()
+            }
+            if reason != lastPlanEvent {
+                event(reason); lastPlanEvent = reason
+            }
+        } catch {
+            load.stop(); cpuLoad = 0; gpuLoad = 0; setAssertion(false)
+            mode = .system; plan = nil
+            var message = error.localizedDescription
+            if authorized && !demo {
+                do { try hardware.request("charge"); appliedCharging = true }
+                catch { message += "；恢复充电失败：\(error.localizedDescription)" }
+            }
+            if !demo && hardware.authorized {
+                try? hardware.request("quit")
+                hardware.authorized = false
+            }
+            authorized = demo
+            reason = "任务已停止"
+            if errorMessage != message { event(message); errorMessage = message }
+        }
+    }
+    func shutdown() {
+        timer?.invalidate(); timer = nil
+        load.stop(); setAssertion(false)
+        if authorized && !demo {
+            do { try hardware.request("quit") }
+            catch { event("退出时恢复失败：\(error.localizedDescription)") }
+        }
+        for observer in observers { NSWorkspace.shared.notificationCenter.removeObserver(observer) }
+        observers.removeAll()
+        if controllerLock >= 0 { close(controllerLock); controllerLock = -1 }
+    }
+}
