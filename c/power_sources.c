@@ -82,8 +82,8 @@ BatteryInfo FetchBatteryInfo(void) {
     return info;
   }
 
-  if (!GetBatteryInt(properties, kCurrentCapacityKey,
-                     kNestedCurrentCapacityKey, &info.current_capacity))
+  if (!GetBatteryInt(properties, kCurrentCapacityKey, kNestedCurrentCapacityKey,
+                     &info.current_capacity))
     fprintf(stderr, "batterytool: failed to read IOKit key '%s'\n",
             kCurrentCapacityKey);
   if (!GetBatteryInt(properties, kMaxCapacityKey, kMaxCapacityKey,
