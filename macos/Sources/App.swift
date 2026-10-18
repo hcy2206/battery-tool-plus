@@ -26,9 +26,15 @@ struct NativeApp: App {
         }
         .defaultSize(width: 1060, height: 760)
         .commands { CommandGroup(replacing: .newItem) {} }
-        MenuBarExtra("BatteryTool · \(model.mode.title)", systemImage: "battery.75percent") {
+        MenuBarExtra("BatteryTool · \(model.mode.title)", systemImage: batterySymbol(model.reading)) {
             MenuControls(model: model)
         }
+    }
+    private func batterySymbol(_ reading: Reading) -> String {
+        if reading.charging { return "battery.100percent.bolt" }
+        guard reading.valid else { return "battery.0percent" }
+        let level = [0, 25, 50, 75, 100].min { abs(Double($0) - reading.percent) < abs(Double($1) - reading.percent) }!
+        return "battery.\(level)percent"
     }
 }
 struct MenuControls: View {

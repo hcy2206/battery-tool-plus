@@ -28,14 +28,18 @@ cat > "$APP/Contents/Info.plist" <<PLIST
 <key>CFBundleExecutable</key><string>BatteryTool</string>
 <key>CFBundleIdentifier</key><string>local.batterytool.manager</string>
 <key>CFBundleName</key><string>BatteryTool</string>
+<key>CFBundleDisplayName</key><string>Battery Tool Plus</string>
+<key>CFBundleIconFile</key><string>AppIcon</string>
 <key>CFBundlePackageType</key><string>APPL</string>
 <key>CFBundleShortVersionString</key><string>$APP_VERSION</string>
 <key>CFBundleVersion</key><string>$BUILD_VERSION</string>
 <key>LSMinimumSystemVersion</key><string>15.0</string>
+<key>LSApplicationCategoryType</key><string>public.app-category.utilities</string>
+<key>NSHumanReadableCopyright</key><string>© 2026 hcy2206 and BatteryTool contributors. GPL-3.0-only.</string>
 <key>NSHighResolutionCapable</key><true/>
 </dict></plist>
 PLIST
-cp LICENSE THIRD_PARTY_NOTICES.md "$APP/Contents/Resources/"
+cp LICENSE THIRD_PARTY_NOTICES.md macos/AppIcon.icns "$APP/Contents/Resources/"
 mkdir -p "$APP/Contents/Resources/LICENSES"
 cp LICENSES/*.txt "$APP/Contents/Resources/LICENSES/"
 codesign --force --deep --sign - "$APP"
