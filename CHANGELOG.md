@@ -3,6 +3,28 @@
 Repository: [hcy2206/battery-tool-plus](https://github.com/hcy2206/battery-tool-plus).
 This project is a fork of [BatteryTool](https://github.com/oresttokovenko/battery-tool).
 
+## Unreleased
+
+### Fixed
+
+- A history database write failure no longer stops the task or revokes power authorization; it is shown as a warning.
+- Load workers run at user-initiated QoS so CPU load lands on performance cores, and their heartbeat lease is 15 s so a slow power service cannot cascade into a worker exit.
+- Starting a plan that the policy rejects (for example with the charger unplugged) now reports why.
+- Recommendations are clamped to the 24-hour plan limit; computing a recommendation no longer silently saves settings.
+- The CLI reports that root is required instead of failing on the lock file.
+
+### Added
+
+- Application icon, display name, category and copyright in the bundle.
+- Menu bar icon reflects the current charge level and charging state.
+- CI runs on pushes to `main` and includes the native integration tests.
+
+### Changed
+
+- History records are inserted with bound parameters.
+- Project metadata lists the fork maintainer and repository URLs.
+- Documentation rewritten in a direct voice.
+
 ## [0.4.0-beta.1](https://github.com/hcy2206/battery-tool-plus/releases/tag/v0.4.0-beta.1) (2026-10-18)
 
 ### Added

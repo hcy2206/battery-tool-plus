@@ -103,6 +103,7 @@ just macos-build         # Build dist/BatteryTool.app
 just macos-test          # Pure policy, prediction and SQLite checks
 just macos-integration   # Demo controller/IPC/worker-lifetime checks and view renders
 just macos-demo          # Open the app without real battery writes or compute load
+swift scripts/make-icon.swift macos/AppIcon.icns   # Regenerate the bundled app icon
 uv run pytest           # Python regressions, including the shared controller lock
 ```
 
