@@ -1,3 +1,5 @@
+import os
+
 import nox
 
 nox.options.default_venv_backend = "uv"
@@ -37,6 +39,9 @@ def type_check(session):
 @nox.session
 def c_test(session):
     session.install("meson", "cffi")
-    session.run("meson", "setup", "builddir", "--native-file", "native-macos.ini", success_codes=[0, 1])
+    setup = ["meson", "setup", "builddir", "--native-file", "native-macos.ini"]
+    if os.path.isdir("builddir"):
+        setup.append("--reconfigure")
+    session.run(*setup)
     session.run("meson", "compile", "-C", "builddir")
     session.run("meson", "test", "-C", "builddir", "--no-suite", "hardware")

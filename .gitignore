@@ -21,3 +21,6 @@ subprojects/packagecache/
 
 # Meson build artifacts
 builddir/
+
+# IDE
+.idea/

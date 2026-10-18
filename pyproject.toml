@@ -5,10 +5,13 @@ requires = [ "cffi>=2", "meson-python" ]
 [project]
 name = "battery-tool"
 version = "0.4.0b1"
-description = "A command-line tool to monitor your battery health on macOS in a detrimental way"
+description = "Battery Tool Plus: battery cycling and compute-load manager for Apple Silicon MacBooks"
 readme = "README.md"
 license = { text = "GPL-3.0-only" }
-authors = [ { name = "Orest Tokovenko", email = "hi@oresttokovenko.com" } ]
+authors = [
+  { name = "hcy2206" },
+  { name = "Orest Tokovenko", email = "hi@oresttokovenko.com" },
+]
 requires-python = ">=3.12,<3.13"
 classifiers = [
   "Programming Language :: Python :: 3 :: Only",
@@ -19,6 +22,12 @@ dependencies = [
   "structlog>=25.5",
   "typer>=0.23",
 ]
+urls.Changelog = "https://github.com/hcy2206/battery-tool-plus/blob/main/CHANGELOG.md"
+urls.Homepage = "https://github.com/hcy2206/battery-tool-plus"
+urls.Issues = "https://github.com/hcy2206/battery-tool-plus/issues"
+urls.Releases = "https://github.com/hcy2206/battery-tool-plus/releases"
+urls.Repository = "https://github.com/hcy2206/battery-tool-plus"
+urls.Upstream = "https://github.com/oresttokovenko/battery-tool"
 scripts.battery-tool = "batterytool.main:app"
 
 [dependency-groups]
@@ -33,6 +42,9 @@ dev = [
   "pytest-mock>=3.14",
   "ruff>=0.9.6",
 ]
+
+[tool.uv]
+no-build-isolation-package = [ "battery-tool" ]
 
 [tool.ruff]
 target-version = "py312"
@@ -95,6 +107,3 @@ pythonVersion = "3.12"
 include = [ "src/batterytool/**" ]
 typeCheckingMode = "strict"
 failOnWarnings = false
-
-[tool.uv]
-no-build-isolation-package = [ "battery-tool" ]
