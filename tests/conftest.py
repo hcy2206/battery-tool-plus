@@ -14,6 +14,8 @@ LEGACY_KEYS = MappingProxyType({"CH0B": "00", "CH0C": "00", "CH0I": "00"})
 TAHOE_KEYS = MappingProxyType({"CHTE": "00000000", "CHIE": "08"})
 # Tahoe machine without CHIE, forcing the CH0J fallback path
 TAHOE_FALLBACK_KEYS = MappingProxyType({"CHTE": "00000000", "CH0J": "00"})
+# macOS 27 firmware: no charge-inhibit key at all, only the adapter cut-off
+ADAPTER_KEYS = MappingProxyType({"CHIE": "00"})
 
 
 class FakeHardware:

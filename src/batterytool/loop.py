@@ -4,6 +4,8 @@ from collections.abc import Callable
 import structlog
 
 from batterytool.battery import (
+    adapter_disable_charging,
+    adapter_enable_charging,
     fetch_battery_info,
     legacy_disable_charging,
     legacy_enable_charging,
@@ -123,4 +125,23 @@ def tahoe_loop(
         logger,
         tahoe_enable_charging,
         tahoe_disable_charging,
+    )
+
+
+def adapter_loop(
+    target_health: int,
+    max_charge: int,
+    min_charge: int,
+    interval: int,
+    logger: structlog.stdlib.BoundLogger,
+) -> bool:
+    """Cycle by cutting and restoring the adapter (CHIE only); return whether operation and cleanup succeeded."""
+    return _cycle_loop(
+        target_health,
+        max_charge,
+        min_charge,
+        interval,
+        logger,
+        adapter_enable_charging,
+        adapter_disable_charging,
     )

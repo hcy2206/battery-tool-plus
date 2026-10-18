@@ -41,7 +41,9 @@ int SmcReadKey(const char* key, char* value, int value_size) {
     return -1;
   }
 
-  if (val.dataSize > sizeof(val.bytes)) {
+  // The SMC answers a key-info query for an absent key with success and an
+  // empty descriptor; such a key cannot be read or written.
+  if (val.dataSize == 0 || val.dataSize > sizeof(val.bytes)) {
     return -1;
   }
   int copy_size = (int)val.dataSize;

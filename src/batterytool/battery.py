@@ -40,6 +40,12 @@ Tahoe keys (macOS 15.7+):
 
   Not all Tahoe machines expose the same keys. I detect which keys
   are available at runtime by attempting to read each one
+
+Adapter-only firmware (macOS 27, and the firmware shipped with 15.8 / 26.7):
+
+  CHTE, CH0B and CH0C are gone and their replacements (bfD0/bfE0/bfF0) are
+  entitlement-gated even for root. CHIE still works, and cutting the adapter
+  is what drives the discharge phase anyway, so cycling runs on CHIE alone.
 """
 
 import os
@@ -65,10 +71,25 @@ def is_apple_silicon() -> bool:
     return platform.machine() == "arm64"
 
 
+def _key_exists(key: SMCKeys) -> bool:
+    buf = ffi.new("char[32]")
+    return lib.SmcReadKey(key, buf, 32) == 0
+
+
 def is_tahoe() -> bool:
     """Check if I'm on a Tahoe mac (macOS 15.7+) by trying to read the CHTE key"""
-    buf = ffi.new("char[32]")
-    return lib.SmcReadKey(SMCKeys.CHARGING_CONTROL_TE, buf, 32) == 0
+    return _key_exists(SMCKeys.CHARGING_CONTROL_TE)
+
+
+def detect_charge_control() -> str:
+    """Name the key set this firmware exposes: tahoe, legacy, adapter or none."""
+    if is_tahoe():
+        return "tahoe"
+    if _key_exists(SMCKeys.CHARGING_CONTROL_B):
+        return "legacy"
+    if _key_exists(SMCKeys.DISCHARGE_CONTROL_IE):
+        return "adapter"
+    return "none"
 
 
 class BatteryControlError(RuntimeError):
@@ -138,3 +159,16 @@ def tahoe_disable_charging() -> None:
 def tahoe_enable_charging() -> None:
     """Attempt both charging and discharge restoration, with CH0J fallback."""
     _tahoe_set_charging(enabled=True)
+
+
+# Adapter-only firmware (no charge-inhibit key; CHIE drives both phases)
+
+
+def adapter_disable_charging() -> None:
+    """Cut the adapter via CHIE so the battery discharges."""
+    _write_keys(((SMCKeys.DISCHARGE_CONTROL_IE, SMCValues.TAHOE_ENABLE_DISCHARGE),))
+
+
+def adapter_enable_charging() -> None:
+    """Restore the adapter via CHIE so the battery charges normally."""
+    _write_keys(((SMCKeys.DISCHARGE_CONTROL_IE, SMCValues.TAHOE_DISABLE_DISCHARGE),))

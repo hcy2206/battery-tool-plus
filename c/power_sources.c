@@ -14,16 +14,43 @@ static const char kCycleCountKey[] = "CycleCount";
 static const char kIsChargingKey[] = "IsCharging";
 static const char kExternalConnectedKey[] = "ExternalConnected";
 
+// Newer firmware (macOS 27 and the 15.8 / 26.7 firmware updates) moves the
+// capacity figures into this nested dictionary and renames the raw current
+// capacity, so each integer is looked up at the top level first and then here.
+static const char kBatteryDataKey[] = "BatteryData";
+static const char kNestedCurrentCapacityKey[] = "RemainingCapacity";
+
 static bool GetDictInt(CFDictionaryRef dict, const char* key, void* out,
                        CFNumberType type) {
   CFStringRef cf_key =
       CFStringCreateWithCString(NULL, key, kCFStringEncodingUTF8);
   CFNumberRef ref = CFDictionaryGetValue(dict, cf_key);
   CFRelease(cf_key);
-  if (ref == NULL) {
+  if (ref == NULL || CFGetTypeID(ref) != CFNumberGetTypeID()) {
     return false;
   }
   return CFNumberGetValue(ref, type, out);
+}
+
+static CFDictionaryRef GetBatteryData(CFDictionaryRef dict) {
+  CFStringRef cf_key =
+      CFStringCreateWithCString(NULL, kBatteryDataKey, kCFStringEncodingUTF8);
+  CFDictionaryRef nested = CFDictionaryGetValue(dict, cf_key);
+  CFRelease(cf_key);
+  if (nested == NULL || CFGetTypeID(nested) != CFDictionaryGetTypeID()) {
+    return NULL;
+  }
+  return nested;
+}
+
+static bool GetBatteryInt(CFDictionaryRef dict, const char* key,
+                          const char* nested_key, void* out) {
+  if (GetDictInt(dict, key, out, kCFNumberIntType)) {
+    return true;
+  }
+  CFDictionaryRef nested = GetBatteryData(dict);
+  return nested != NULL &&
+         GetDictInt(nested, nested_key, out, kCFNumberIntType);
 }
 
 static bool GetDictBool(CFDictionaryRef dict, const char* key, bool* out) {
@@ -55,16 +82,16 @@ BatteryInfo FetchBatteryInfo(void) {
     return info;
   }
 
-  if (!GetDictInt(properties, kCurrentCapacityKey, &info.current_capacity,
-                  kCFNumberIntType))
+  if (!GetBatteryInt(properties, kCurrentCapacityKey,
+                     kNestedCurrentCapacityKey, &info.current_capacity))
     fprintf(stderr, "batterytool: failed to read IOKit key '%s'\n",
             kCurrentCapacityKey);
-  if (!GetDictInt(properties, kMaxCapacityKey, &info.max_capacity,
-                  kCFNumberIntType))
+  if (!GetBatteryInt(properties, kMaxCapacityKey, kMaxCapacityKey,
+                     &info.max_capacity))
     fprintf(stderr, "batterytool: failed to read IOKit key '%s'\n",
             kMaxCapacityKey);
-  if (!GetDictInt(properties, kDesignCapacityKey, &info.design_capacity,
-                  kCFNumberIntType))
+  if (!GetBatteryInt(properties, kDesignCapacityKey, kDesignCapacityKey,
+                     &info.design_capacity))
     fprintf(stderr, "batterytool: failed to read IOKit key '%s'\n",
             kDesignCapacityKey);
   if (!GetDictInt(properties, kCycleCountKey, &info.cycle_count,

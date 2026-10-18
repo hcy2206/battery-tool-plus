@@ -3,10 +3,10 @@ from typing import TYPE_CHECKING, Annotated
 
 import typer
 
-from batterytool.battery import fetch_battery_info, is_apple_silicon, is_tahoe
+from batterytool.battery import detect_charge_control, fetch_battery_info, is_apple_silicon
 from batterytool.locking import hardware_lock
 from batterytool.logging import setup_logging
-from batterytool.loop import legacy_loop, tahoe_loop
+from batterytool.loop import adapter_loop, legacy_loop, tahoe_loop
 
 if TYPE_CHECKING:
     from batterytool.iokit_wrapper import BatteryInfo
@@ -69,12 +69,15 @@ def main(
         logger.error("charger_not_connected", message="Charger not connected. Exiting...")
         raise typer.Exit(1)
 
+    loops = {"tahoe": tahoe_loop, "legacy": legacy_loop, "adapter": adapter_loop}
     try:
         with hardware_lock():
-            if is_tahoe():
-                success = tahoe_loop(target_health, max_charge, min_charge, interval, logger)
-            else:
-                success = legacy_loop(target_health, max_charge, min_charge, interval, logger)
+            control = detect_charge_control()
+            logger.info("charge_control", method=control)
+            if control not in loops:
+                logger.error("unsupported_firmware", message="No usable SMC charge control key (CHTE/CH0B/CHIE)")
+                raise typer.Exit(1)
+            success = loops[control](target_health, max_charge, min_charge, interval, logger)
     except (OSError, RuntimeError) as exc:
         logger.error("controller_unavailable", error=str(exc))
         raise typer.Exit(1) from exc

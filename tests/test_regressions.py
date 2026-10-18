@@ -12,9 +12,9 @@ from typer.testing import CliRunner
 
 from batterytool.battery import BatteryControlError, legacy_enable_charging, tahoe_enable_charging, ffi, lib
 from batterytool.logging import setup_logging
-from batterytool.loop import legacy_loop, tahoe_loop
+from batterytool.loop import adapter_loop, legacy_loop, tahoe_loop
 from batterytool.main import app
-from tests.conftest import LEGACY_KEYS, TAHOE_KEYS
+from tests.conftest import ADAPTER_KEYS, LEGACY_KEYS, TAHOE_KEYS
 
 
 @pytest.mark.parametrize("args", [
@@ -52,6 +52,7 @@ def test_cli_startup_errors_exit_nonzero(hw, row):
 @pytest.mark.parametrize("loop,keys,disable,enable", [
     (legacy_loop, LEGACY_KEYS, ("CH0B=02", "CH0C=02", "CH0I=01"), ("CH0B=00", "CH0C=00", "CH0I=00")),
     (tahoe_loop, TAHOE_KEYS, ("CHTE=01000000", "CHIE=08"), ("CHTE=00000000", "CHIE=00")),
+    (adapter_loop, ADAPTER_KEYS, ("CHIE=08",), ("CHIE=00",)),
 ])
 def test_exact_thresholds_switch_and_disconnect_restores(hw, loop, keys, disable, enable):
     hw.set_keys(keys)
@@ -148,3 +149,24 @@ def test_cli_reports_cleanup_failure(hw):
     result = CliRunner().invoke(app, [])
     assert result.exit_code == 1
     assert "cleanup_failed" in result.output
+
+
+@pytest.mark.apple_silicon
+def test_cli_refuses_firmware_without_charge_keys(hw):
+    hw.set_keys({"ACLC": "03"})  # macOS 27 firmware: CHTE/CH0B gone and CHIE absent too
+    hw.script((50, 100, 100, 10, 1, 1))
+    result = CliRunner().invoke(app, [])
+    assert result.exit_code == 1
+    assert "unsupported_firmware" in result.output
+    assert hw.writes() == ()
+
+
+@pytest.mark.apple_silicon
+def test_cli_selects_adapter_loop_when_only_chie_exists(hw):
+    hw.set_keys(ADAPTER_KEYS)
+    # main() consumes the first row for its startup check; the loop then sees 96% and the target row.
+    hw.script((96, 100, 100, 10, 1, 1), (96, 100, 100, 10, 1, 1), (79, 79, 100, 10, 1, 1))
+    result = CliRunner().invoke(app, ["--interval", "1"])
+    assert result.exit_code == 0, result.output
+    assert '"method": "adapter"' in result.output
+    assert hw.writes() == ("CHIE=08", "CHIE=00")

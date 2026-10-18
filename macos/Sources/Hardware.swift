@@ -12,21 +12,32 @@ func batteryReading() -> Reading {
                    plugged: info.is_plugged_in, charging: info.is_charging, cycles: Int(info.cycle_count))
 }
 
+/// Charge-inhibit keys differ by firmware: CHTE (macOS 15.7–26), CH0B/CH0C (older),
+/// none on the firmware shipped with macOS 27 and the 15.8 / 26.7 updates. The adapter
+/// cut-off key (CHIE, else CH0J/CH0I) is what actually drives the discharge phase, so
+/// cycling works with it alone; the inhibit keys are applied when the firmware has them.
 func writeCharging(_ enabled: Bool) throws {
-    var buffer = [CChar](repeating: 0, count: 32)
-    let modern = SmcReadKey("CHTE", &buffer, 32) == 0
-    var failures = [String]()
+    func exists(_ key: String) -> Bool {
+        var buffer = [CChar](repeating: 0, count: 32)
+        return SmcReadKey(key, &buffer, 32) == 0
+    }
     func write(_ key: String, _ value: String) -> Bool { SmcWriteKey(key, value) == 0 }
-    if modern {
-        if !write("CHTE", enabled ? "00000000" : "01000000") { failures.append("CHTE") }
-        if enabled || failures.isEmpty {
-            if !write("CHIE", enabled ? "00" : "08") && !write("CH0J", enabled ? "00" : "01") {
-                failures.append("CHIE/CH0J")
-            }
-        }
-    } else {
-        for (key, value) in [("CH0B", enabled ? "00" : "02"), ("CH0C", enabled ? "00" : "02"), ("CH0I", enabled ? "00" : "01")] {
-            if !write(key, value) { failures.append(key); if !enabled { break } }
+    let inhibit: [(String, String)]
+    if exists("CHTE") { inhibit = [("CHTE", enabled ? "00000000" : "01000000")] }
+    else if exists("CH0B") { inhibit = [("CH0B", enabled ? "00" : "02"), ("CH0C", enabled ? "00" : "02")] }
+    else { inhibit = [] }
+    let adapter: [(String, String)] = exists("CHIE") ? [("CHIE", enabled ? "00" : "08")]
+        : [("CH0J", enabled ? "00" : "01"), ("CH0I", enabled ? "00" : "01")]
+    var failures = [String]()
+    for (key, value) in inhibit where !write(key, value) {
+        failures.append(key)
+        // Never cut the adapter when the firmware refused to stop charging.
+        if !enabled { throw AppError.message("SMC 写入失败：" + failures.joined(separator: ", ")) }
+    }
+    if !adapter.contains(where: { write($0.0, $0.1) }) {
+        failures.append(adapter.map(\.0).joined(separator: "/"))
+        if inhibit.isEmpty {
+            throw AppError.message("此固件没有可用的充电控制键（CHTE/CH0B/CHIE 均不可写），无法控制电池。")
         }
     }
     if !failures.isEmpty { throw AppError.message("SMC 写入失败：" + failures.joined(separator: ", ")) }
