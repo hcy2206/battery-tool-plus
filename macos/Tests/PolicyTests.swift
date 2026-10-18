@@ -56,6 +56,10 @@ import Foundation
         let fallback = Predictor.recommend(now: morning, settings: settings, samples: [], calendar: calendar)
         check(fallback.start == morning, "overnight fallback starts now")
         check(calendar.component(.hour, from: fallback.end) == 8, "overnight end")
+        let windowEnd = calendar.date(from: DateComponents(year: 2026, month: 10, day: 19, hour: 8))!
+        let wrapped = Predictor.recommend(now: windowEnd, settings: settings, samples: [], calendar: calendar)
+        check(wrapped.end.timeIntervalSince(windowEnd) <= Predictor.maximumWindow && wrapped.start < wrapped.end,
+              "recommendation stays inside the 24 h plan limit")
         var samples = [Observation]()
         for day in [12, 13, 14, 15, 16] {
             for minute in stride(from: 0, to: 120, by: 15) {

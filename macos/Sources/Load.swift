@@ -19,11 +19,12 @@ func makeLoadPipeline(device: MTLDevice) throws -> MTLComputePipelineState {
 }
 
 /// Worker lifetime is leased through stdin; no parent heartbeat means exit.
+/// Workers run at user-initiated QoS so Apple Silicon schedules them on performance cores.
 func runLoadWorker(kind: String, intensity: Double, threads: Int) -> Int32 {
     guard intensity > 0, intensity <= 1, threads >= 1, threads <= ProcessInfo.processInfo.activeProcessorCount else { return 1 }
     if kind == "cpu" {
         for index in 0..<threads {
-            DispatchQueue.global(qos: .utility).async {
+            DispatchQueue.global(qos: .userInitiated).async {
                 var value = Double(index + 1)
                 while true {
                     let start = ProcessInfo.processInfo.systemUptime
@@ -42,7 +43,7 @@ func runLoadWorker(kind: String, intensity: Double, threads: Int) -> Int32 {
             guard let buffer = device.makeBuffer(length: 65536 * MemoryLayout<Float>.size, options: .storageModeShared)
             else { return 2 }
             let pipeline = try makeLoadPipeline(device: device)
-            DispatchQueue.global(qos: .utility).async {
+            DispatchQueue.global(qos: .userInitiated).async {
                 while true {
                     autoreleasepool {
                         let start = ProcessInfo.processInfo.systemUptime
@@ -66,10 +67,13 @@ func runLoadWorker(kind: String, intensity: Double, threads: Int) -> Int32 {
 }
 
 /// Shared by real load workers and a computation-free lifecycle probe.
-func waitForLoadLease() -> Int32 {
+/// The controller heartbeats every 2 s; the lease covers its worst-case blocking
+/// on the power service (two requests with 2 s send/receive timeouts each).
+let loadLeaseMilliseconds: Int32 = 15000
+func waitForLoadLease(milliseconds: Int32 = loadLeaseMilliseconds) -> Int32 {
     while true {
         var descriptor = pollfd(fd: STDIN_FILENO, events: Int16(POLLIN | POLLHUP), revents: 0)
-        guard poll(&descriptor, 1, 6000) > 0 else { return 0 }
+        guard poll(&descriptor, 1, milliseconds) > 0 else { return 0 }
         var buffer = [UInt8](repeating: 0, count: 64)
         guard read(STDIN_FILENO, &buffer, buffer.count) > 0 else { return 0 }
     }

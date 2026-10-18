@@ -225,7 +225,7 @@ struct ManagerView: View {
                         .font(.caption).foregroundStyle(.secondary)
                     Stepper("初始空闲开始：\(model.settings.idleStartHour):00", value: $model.settings.idleStartHour, in: 0...23)
                     Stepper("初始空闲结束：\(model.settings.idleEndHour):00", value: $model.settings.idleEndHour, in: 0...23)
-                    Button("保存并计算推荐") { model.recommend() }
+                    Button("保存并计算推荐") { if model.saveSettings() { model.recommend() } }
                 }.frame(maxWidth: .infinity, alignment: .leading).padding(12)
             }
             if let recommendation = model.recommendation {

@@ -134,11 +134,14 @@ import IOKit.pwr_mgt
         startGrace = Date().addingTimeInterval(settings.idleSeconds)
         event("确认定时压测：\(plan.goal.title)，截止 \(plan.deadline.formatted())")
         tick()
-        return mode == .timed || mode == .ready
+        let started = mode == .timed || mode == .ready
+        if !started && errorMessage == nil { errorMessage = "无法启动任务：\(reason)" }
+        return started
     }
     func togglePause() { paused.toggle(); event(paused ? "手动暂停负载" : "恢复负载"); tick() }
     func recommend() {
-        guard saveSettings() else { return }
+        // Recommendation reads the form as edited; saving stays an explicit user action.
+        do { try settings.validate() } catch { errorMessage = error.localizedDescription; return }
         recommendation = Predictor.recommend(now: Date(), settings: settings,
                                              samples: history?.samples(since: Date().addingTimeInterval(-28*86400)) ?? [])
     }
@@ -235,10 +238,13 @@ import IOKit.pwr_mgt
             }
             if self.settings.recordHistory && reading.valid && observationGap <= 10 && now.timeIntervalSince(lastSample) >= 30 {
                 // Genuine idle input is recorded; heat pauses and load state are not labels for user activity.
-                try history?.add(Observation(time: now, idle: idleSeconds >= settings.idleSeconds,
-                                             percent: reading.percent, charging: reading.charging, load: scale > 0))
+                // A history write failure must never end power control, so it is reported without leaving the task.
                 lastSample = now
-                refreshHistory()
+                do {
+                    try history?.add(Observation(time: now, idle: idleSeconds >= settings.idleSeconds,
+                                                 percent: reading.percent, charging: reading.charging, load: scale > 0))
+                    refreshHistory()
+                } catch { warning = "历史记录写入失败：\(error.localizedDescription)" }
             }
             if reason != lastPlanEvent {
                 event(reason); lastPlanEvent = reason

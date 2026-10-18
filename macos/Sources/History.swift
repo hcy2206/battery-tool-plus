@@ -34,22 +34,38 @@ final class History {
     private func execute(_ sql: String) throws {
         guard sqlite3_exec(db, sql, nil, nil, nil) == SQLITE_OK else { throw AppError.message("历史数据库写入失败") }
     }
+    private func insert(_ sql: String, _ values: [Any]) throws {
+        var statement: OpaquePointer?
+        guard sqlite3_prepare_v2(db, sql, -1, &statement, nil) == SQLITE_OK else { throw AppError.message("历史数据库写入失败") }
+        defer { sqlite3_finalize(statement) }
+        for (index, value) in values.enumerated() {
+            let column = Int32(index + 1)
+            switch value {
+            case let number as Double: sqlite3_bind_double(statement, column, number)
+            case let flag as Bool: sqlite3_bind_int(statement, column, flag ? 1 : 0)
+            case let text as String:
+                sqlite3_bind_text(statement, column, text, -1, unsafeBitCast(-1, to: sqlite3_destructor_type.self))
+            default: throw AppError.message("历史数据库写入失败")
+            }
+        }
+        guard sqlite3_step(statement) == SQLITE_DONE else { throw AppError.message("历史数据库写入失败") }
+    }
     private func prune() throws {
         let now = Date()
         guard now.timeIntervalSince(lastPrune) >= 3600 else { return }
         let cutoff = now.addingTimeInterval(-90*86400).timeIntervalSince1970
-        try execute("DELETE FROM samples WHERE time < \(cutoff)")
-        try execute("DELETE FROM events WHERE time < \(cutoff)")
+        try insert("DELETE FROM samples WHERE time < ?", [cutoff])
+        try insert("DELETE FROM events WHERE time < ?", [cutoff])
         lastPrune = now
     }
     func add(_ sample: Observation) throws {
         try prune()
-        try execute("INSERT INTO samples VALUES (\(sample.time.timeIntervalSince1970), \(sample.idle ? 1 : 0), \(sample.percent), \(sample.charging ? 1 : 0), \(sample.load ? 1 : 0))")
+        try insert("INSERT INTO samples VALUES (?, ?, ?, ?, ?)",
+                   [sample.time.timeIntervalSince1970, sample.idle, sample.percent, sample.charging, sample.load])
     }
     func event(_ text: String, at date: Date = Date()) throws {
         try prune()
-        let escaped = text.replacingOccurrences(of: "'", with: "''")
-        try execute("INSERT INTO events VALUES (\(date.timeIntervalSince1970), '\(escaped)')")
+        try insert("INSERT INTO events VALUES (?, ?)", [date.timeIntervalSince1970, text])
     }
     func events() -> [String] {
         var statement: OpaquePointer?
@@ -82,7 +98,15 @@ final class History {
 }
 
 struct Predictor {
+    /// Timed plans must end within 24 hours; keep every recommendation inside that limit
+    /// with a margin for the time between showing it and the user confirming.
+    static let maximumWindow: TimeInterval = 24*3600 - 15*60
     static func recommend(now: Date, settings: Settings, samples: [Observation], calendar: Calendar = .current) -> Recommendation {
+        let suggestion = learnedOrFallback(now: now, settings: settings, samples: samples, calendar: calendar)
+        let end = min(suggestion.end, now.addingTimeInterval(maximumWindow))
+        return Recommendation(start: min(suggestion.start, end), end: end, reason: suggestion.reason)
+    }
+    private static func learnedOrFallback(now: Date, settings: Settings, samples: [Observation], calendar: Calendar) -> Recommendation {
         // Each slot/day is one vote, preventing long or frequently sampled sessions dominating.
         var votes: [Int: [Date: (Double, Double)]] = [:]
         let weekend = calendar.isDateInWeekend(now)

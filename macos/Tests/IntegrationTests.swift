@@ -12,7 +12,7 @@ import AppKit
                 try text.write(to: log, atomically: true, encoding: .utf8)
             })
         }
-        if CommandLine.arguments.contains("--lease-probe") { exit(waitForLoadLease()) }
+        if CommandLine.arguments.contains("--lease-probe") { exit(waitForLoadLease(milliseconds: 2000)) }
         // Exercise the exact worker heartbeat loop without running any compute work.
         let probe = Process()
         let input = Pipe()
