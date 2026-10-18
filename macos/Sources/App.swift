@@ -225,27 +225,71 @@ struct ManagerView: View {
     private var idleSettings: some View {
         VStack(alignment: .leading, spacing: 20) {
             GroupBox("本地学习") {
-                Form {
-                    Toggle("记录空闲状态与电量历史，用于推荐", isOn: $model.settings.recordHistory)
-                    Text("仅保存时间、活动/空闲状态、电量和负载状态，不记录按键内容。保留最近 90 天；应用未运行或睡眠期间视为未知。")
+                VStack(alignment: .leading, spacing: 16) {
+                    Toggle(isOn: $model.settings.recordHistory) {
+                        VStack(alignment: .leading, spacing: 4) {
+                            Text("记录空闲状态与电量历史，用于推荐")
+                            Text("只保存时间、活动/空闲、电量和负载状态，不记录按键内容；保留最近 90 天。应用未运行或睡眠期间记为未知。")
+                                .font(.caption).foregroundStyle(.secondary)
+                        }
+                    }
+                    Divider()
+                    HStack(spacing: 32) {
+                        hourPicker("初始空闲开始", $model.settings.idleStartHour)
+                        hourPicker("初始空闲结束", $model.settings.idleEndHour)
+                        Spacer()
+                        Button("保存并计算推荐") { if model.saveSettings() { model.recommend() } }
+                    }
+                    Text("历史记录不足时按这个时段推荐，支持跨午夜（例如 23:00 到次日 8:00）。")
                         .font(.caption).foregroundStyle(.secondary)
-                    Stepper("初始空闲开始：\(model.settings.idleStartHour):00", value: $model.settings.idleStartHour, in: 0...23)
-                    Stepper("初始空闲结束：\(model.settings.idleEndHour):00", value: $model.settings.idleEndHour, in: 0...23)
-                    Button("保存并计算推荐") { if model.saveSettings() { model.recommend() } }
-                }.frame(maxWidth: .infinity, alignment: .leading).padding(12)
+                }.frame(maxWidth: .infinity, alignment: .leading).padding(14)
             }
-            if let recommendation = model.recommendation {
-                Text("建议窗口").font(.headline)
-                Text("\(recommendation.start.formatted())\n至 \(recommendation.end.formatted())").font(.title2)
-                Text(recommendation.reason).foregroundStyle(.secondary)
-                Button("使用此窗口设置任务") {
-                    start = recommendation.start; deadline = recommendation.end; page = "任务设置"
-                    model.event("接受推荐时间窗口")
-                }.buttonStyle(.borderedProminent)
+            GroupBox("建议窗口") {
+                VStack(alignment: .leading, spacing: 14) {
+                    if let recommendation = model.recommendation {
+                        HStack(alignment: .center, spacing: 20) {
+                            windowTile("开始", recommendation.start)
+                            Image(systemName: "arrow.right").font(.title2).foregroundStyle(.tertiary)
+                            windowTile("结束", recommendation.end)
+                            Spacer()
+                            windowTile("时长", nil, text: durationText(recommendation.end.timeIntervalSince(recommendation.start)))
+                        }
+                        Text(recommendation.reason).font(.callout).foregroundStyle(.secondary)
+                        Button("使用此窗口设置任务") {
+                            start = recommendation.start; deadline = recommendation.end; page = "任务设置"
+                            model.event("接受推荐时间窗口")
+                        }.buttonStyle(.borderedProminent)
+                    } else {
+                        Text("点击“保存并计算推荐”生成建议窗口。").foregroundStyle(.secondary)
+                    }
+                }.frame(maxWidth: .infinity, alignment: .leading).padding(14)
             }
-            Text("推荐不会自行启动或扩大已批准的窗口。观看视频等没有键鼠输入的活动可能被识别为空闲；可手动暂停本次负载。")
-                .foregroundStyle(.secondary)
+            Text("推荐只在你确认后启动，不会自行扩大窗口。看视频、开会等没有键鼠输入的活动会被判断为空闲，需要时手动暂停负载。")
+                .font(.callout).foregroundStyle(.secondary)
         }
+    }
+    private func hourPicker(_ title: String, _ value: Binding<Int>) -> some View {
+        HStack(spacing: 10) {
+            Text(title)
+            Picker(title, selection: value) {
+                ForEach(0..<24, id: \.self) { Text(String(format: "%02d:00", $0)).tag($0) }
+            }.labelsHidden().frame(width: 96)
+        }
+    }
+    private func windowTile(_ title: String, _ date: Date?, text: String? = nil) -> some View {
+        VStack(alignment: .leading, spacing: 6) {
+            Text(title).font(.caption).foregroundStyle(.secondary)
+            if let date {
+                Text(date.formatted(date: .abbreviated, time: .omitted)).font(.callout)
+                Text(date.formatted(date: .omitted, time: .shortened)).font(.title2.monospacedDigit().bold())
+            } else {
+                Text(text ?? "").font(.title2.monospacedDigit().bold())
+            }
+        }
+    }
+    private func durationText(_ interval: TimeInterval) -> String {
+        let minutes = Int(interval / 60)
+        return minutes % 60 == 0 ? "\(minutes / 60) 小时" : "\(minutes / 60) 小时 \(minutes % 60) 分"
     }
     private struct ChartSample: Identifiable {
         var id: Int
