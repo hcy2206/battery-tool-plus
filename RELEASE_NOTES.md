@@ -12,7 +12,7 @@ Battery Tool Plus 的首个 macOS 图形管理版本，基于 BatteryTool 0.3.0�
 
 ## 下载与安装
 
-下载 `BatteryToolPlus-0.4.0-beta.1-macos-arm64.zip`，解压后把 `BatteryTool.app` 放进“应用程序”。
+下载 `BatteryToolPlus-0.4.0-beta.1-macos-arm64.dmg`，双击挂载后把 `BatteryTool.app` 拖到 Applications。
 支持 Apple Silicon、macOS 15 及以上，无需 Python。
 
 应用使用 ad-hoc 签名。首次打开时在“系统设置 → 隐私与安全性”点“仍要打开”。

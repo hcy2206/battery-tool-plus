@@ -21,6 +21,7 @@ This project is a fork of [BatteryTool](https://github.com/oresttokovenko/batter
 
 ### Changed
 
+- The application ships as a signed DMG with an Applications shortcut instead of a ZIP.
 - History records are inserted with bound parameters.
 - Project metadata lists the fork maintainer and repository URLs.
 - Documentation rewritten in a direct voice.

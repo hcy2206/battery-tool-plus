@@ -47,7 +47,7 @@ PyPI 上的 `battery-tool` 是上游包，不包含本项目的图形应用与�
 ## 下载与安装
 
 从 [GitHub Releases](https://github.com/hcy2206/battery-tool-plus/releases) 下载
-`BatteryToolPlus-<版本>-macos-arm64.zip`，解压后把 `BatteryTool.app` 拖进“应用程序”。无需安装 Python 或 Xcode。
+`BatteryToolPlus-<版本>-macos-arm64.dmg`，双击挂载后把 `BatteryTool.app` 拖到旁边的 Applications 快捷方式上。无需安装 Python 或 Xcode。
 
 Release 同时提供对应源码归档和 `SHA256SUMS`，把两者放在同一目录即可校验：
 

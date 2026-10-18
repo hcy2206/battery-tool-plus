@@ -26,7 +26,7 @@ gh release create v0.4.0-beta.1 dist/release/* \
   --title 'Battery Tool Plus v0.4.0-beta.1' --notes-file RELEASE_NOTES.md
 ```
 
-脚本构建应用、校验签名、plist 和部署目标，生成应用 ZIP、对应 HEAD 的源码 tar.gz 和 SHA256SUMS；
+脚本构建应用、校验签名、plist 和部署目标，生成应用 DMG（含 Applications 快捷方式，挂载校验后再推出）、对应 HEAD 的源码 tar.gz 和 SHA256SUMS；
 `BUILD_COMMIT.txt` 记录构建提交。发布新版本前清空 `dist/release`，避免上传旧附件；
 已发布的标签和文件不要覆盖。核对草稿后公开：
 
