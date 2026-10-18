@@ -7,6 +7,8 @@ This project is a fork of [BatteryTool](https://github.com/oresttokovenko/batter
 
 ### Fixed
 
+- Battery readings on macOS 27 and the 15.8 / 26.7 firmware: capacity figures are read from the nested `BatteryData` dictionary when the top-level keys are absent, instead of reporting -1 % / 0 % health.
+- Charge control on that firmware: the SMC wrapper no longer treats an absent key as readable, and both the app and the CLI pick the key set the firmware actually has (CHTE, CH0B/CH0C, or CHIE adapter cut-off alone) instead of failing on CHTE.
 - A history database write failure no longer stops the task or revokes power authorization; it is shown as a warning.
 - Load workers run at user-initiated QoS so CPU load lands on performance cores, and their heartbeat lease is 15 s so a slow power service cannot cascade into a worker exit.
 - Starting a plan that the policy rejects (for example with the charger unplugged) now reports why.
@@ -15,6 +17,7 @@ This project is a fork of [BatteryTool](https://github.com/oresttokovenko/batter
 
 ### Added
 
+- Idle recommendation page relaid out: grouped learning settings, hour pickers and a start / end / duration window card.
 - Application icon, display name, category and copyright in the bundle.
 - Menu bar icon reflects the current charge level and charging state.
 - CI runs on pushes to `main` and includes the native integration tests.

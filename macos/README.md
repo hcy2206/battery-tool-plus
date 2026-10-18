@@ -65,6 +65,8 @@ open dist/BatteryTool.app --args --demo
   并校验连接方的用户身份；不接受任意 SMC 键或 shell 命令。图形应用每 2 秒续租，
   失联 12 秒后服务恢复充电并退出。负载进程在 stdin 关闭或 15 秒无心跳后退出。
 - 图形应用与 Python CLI 共用 `/var/run/batterytool-control.lock`，同一时间只有一个控制器写电池。
+- SMC 键按固件自动选择：充电抑制用 CHTE（macOS 15.7–26）或 CH0B/CH0C（更早），放电用 CHIE（否则 CH0J/CH0I）。
+  macOS 27 及 15.8 / 26.7 更新后的固件删除了充电抑制键，循环只靠 CHIE 切断/恢复适配器完成，充电阶段由系统正常充电。
 
 ## 空闲学习与历史
 
