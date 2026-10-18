@@ -7,6 +7,7 @@ from batterytool import locking
 
 def test_real_controller_lock_rejects_second_owner_and_releases(tmp_path, monkeypatch):
     monkeypatch.delenv("BATTERYTOOL_FAKE", raising=False)
+    monkeypatch.setattr(locking.os, "geteuid", lambda: 0)
     monkeypatch.setattr(locking, "CONTROL_LOCK", str(tmp_path / "control.lock"))
     with locking.hardware_lock():
         with pytest.raises(RuntimeError, match="already running"):
@@ -27,6 +28,7 @@ def test_fake_backend_does_not_touch_system_lock(tmp_path, monkeypatch):
 
 def test_lock_refuses_symlink(tmp_path, monkeypatch):
     monkeypatch.delenv("BATTERYTOOL_FAKE", raising=False)
+    monkeypatch.setattr(locking.os, "geteuid", lambda: 0)
     target = tmp_path / "target"
     target.write_text("unchanged")
     link = tmp_path / "lock"
@@ -36,3 +38,14 @@ def test_lock_refuses_symlink(tmp_path, monkeypatch):
         with locking.hardware_lock():
             pytest.fail("Followed a symlink")
     assert target.read_text() == "unchanged"
+
+
+def test_real_controller_requires_root(tmp_path, monkeypatch):
+    monkeypatch.delenv("BATTERYTOOL_FAKE", raising=False)
+    monkeypatch.setattr(locking.os, "geteuid", lambda: 501)
+    path = tmp_path / "control.lock"
+    monkeypatch.setattr(locking, "CONTROL_LOCK", str(path))
+    with pytest.raises(RuntimeError, match="sudo"):
+        with locking.hardware_lock():
+            pytest.fail("Acquired the hardware lock without root")
+    assert not path.exists()

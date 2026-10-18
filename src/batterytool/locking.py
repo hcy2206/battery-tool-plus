@@ -14,6 +14,8 @@ def hardware_lock() -> Iterator[None]:
     if os.environ.get("BATTERYTOOL_FAKE"):
         yield
         return
+    if os.geteuid() != 0:
+        raise RuntimeError("Battery control writes SMC keys and needs root: run with sudo")
     descriptor = os.open(CONTROL_LOCK, os.O_CREAT | os.O_RDWR | os.O_NOFOLLOW, 0o600)
     try:
         try:
