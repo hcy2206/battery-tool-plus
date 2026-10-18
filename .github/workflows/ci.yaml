@@ -1,6 +1,8 @@
 name: CI
 
 on:
+  push:
+    branches: [main]
   pull_request:
     branches: [main]
 
@@ -16,7 +18,7 @@ jobs:
       - name: Check C formatting
         uses: jidicula/clang-format-action@v4.18.0
         with:
-          clang-format-version: "22"
+          clang-format-version: "21"
           check-path: c
           # mirror the justfile: top-level c/ only, third-party smc.c/smc.h excluded
           include-regex: "c/[^/]+\\.(c|h)$"
@@ -79,5 +81,7 @@ jobs:
       - uses: actions/checkout@v4
       - name: Test native policy and history
         run: ./scripts/test-macos.sh
+      - name: Test demo controller, IPC, worker lifetime and view rendering
+        run: ./scripts/test-macos-integration.sh
       - name: Build native management app
         run: ./scripts/build-macos.sh
