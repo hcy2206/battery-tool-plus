@@ -2,14 +2,14 @@
 
 import fcntl
 import os
-from collections.abc import Iterator
+from collections.abc import Generator
 from contextlib import contextmanager
 
 CONTROL_LOCK = "/var/run/batterytool-control.lock"
 
 
 @contextmanager
-def hardware_lock() -> Iterator[None]:
+def hardware_lock() -> Generator[None, None, None]:
     """Allow only one real battery controller; fake tests never acquire system locks."""
     if os.environ.get("BATTERYTOOL_FAKE"):
         yield
