@@ -44,8 +44,15 @@ struct MenuControls: View {
         Text("\(model.reading.percent, specifier: "%.0f")% · \(model.mode.title)")
         Button("打开管理窗口") { openWindow(id: "manager"); NSApp.activate(ignoringOtherApps: true) }
         Divider()
-        Button("准备外出") { model.switchMode(.ready) }
-        Button("停止并交还系统管理") { model.switchMode(.system) }
+        Picker("模式", selection: Binding(get: { model.mode }, set: { selected in
+            guard selected != model.mode else { return }
+            if selected == .timed { openWindow(id: "manager"); NSApp.activate(ignoringOtherApps: true) }
+            else { model.switchMode(selected) }
+        })) {
+            ForEach(Mode.allCases, id: \.self) { Text($0.title).tag($0) }
+        }.pickerStyle(.inline)
+        Divider()
+        Button(model.paused ? "恢复负载" : "暂停负载") { model.togglePause() }.disabled(model.mode != .timed)
         Divider()
         Button("退出并恢复充电") { NSApp.terminate(nil) }
     }
@@ -151,18 +158,50 @@ struct ManagerView: View {
                     }
                 }.frame(maxWidth: .infinity, alignment: .leading).padding(12)
             }
-            HStack {
-                Button("准备外出 · 停止并充电") { model.switchMode(.ready) }.buttonStyle(.borderedProminent)
-                Button("日常循环 · 无负载") { model.switchMode(.daily) }
-                Button("设置定时压测") { page = "任务设置"; model.recommend() }
+            VStack(alignment: .leading, spacing: 8) {
+                Text("模式").font(.headline)
+                HStack(spacing: 10) {
+                    ForEach(Mode.allCases, id: \.self) { candidate in modeButton(candidate) }
+                }
+                Text("四种模式互斥，高亮为当前模式。退出应用时交还系统管理并恢复充电。")
+                    .font(.caption).foregroundStyle(.secondary)
             }
-            HStack {
-                Button(model.paused ? "恢复负载" : "暂停负载") { model.togglePause() }.disabled(model.mode != .timed)
-                Button("停止并交还系统管理", role: .destructive) { model.switchMode(.system) }
+            VStack(alignment: .leading, spacing: 8) {
+                Text("操作").font(.headline)
+                HStack {
+                    Button("设置定时…") { openPlanSettings() }
+                    Button(model.paused ? "恢复负载" : "暂停负载") { model.togglePause() }.disabled(model.mode != .timed)
+                    Button("停止并交还系统管理", role: .destructive) { model.switchMode(.system) }.disabled(model.mode == .system)
+                }
             }
             Text("负载档位控制计算任务的工作比例，不代表精确的系统占用率。充电和放电阶段均保持你设置的负载，系统温控仍优先。")
                 .font(.callout).foregroundStyle(.secondary)
         }
+    }
+    private func openPlanSettings() { page = "任务设置"; model.recommend() }
+    private func modeSummary(_ mode: Mode) -> String {
+        switch mode {
+        case .system: return "由 macOS 管理电源"
+        case .ready: return "保持接管，正常充电"
+        case .daily: return "按上下限循环，无负载"
+        case .timed: return model.plan == nil ? "需先设置计划" : "按计划充放电压测"
+        }
+    }
+    private func modeButton(_ candidate: Mode) -> some View {
+        let selected = model.mode == candidate
+        return Button {
+            guard !selected else { return }
+            if candidate == .timed { openPlanSettings() } else { model.switchMode(candidate) }
+        } label: {
+            VStack(alignment: .leading, spacing: 2) {
+                Text(candidate.title).fontWeight(.semibold)
+                Text(modeSummary(candidate)).font(.caption).opacity(0.8)
+            }
+            .foregroundStyle(selected ? Color.white : Color.primary)
+            .frame(maxWidth: .infinity, alignment: .leading)
+            .padding(.horizontal, 12).padding(.vertical, 8)
+            .background(selected ? Color.accentColor : Color.primary.opacity(0.06), in: RoundedRectangle(cornerRadius: 8))
+        }.buttonStyle(.plain)
     }
     private var taskSettings: some View {
         VStack(alignment: .leading, spacing: 20) {

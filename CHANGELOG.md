@@ -3,6 +3,12 @@
 Repository: [hcy2206/battery-tool-plus](https://github.com/hcy2206/battery-tool-plus).
 This project is a fork of [BatteryTool](https://github.com/oresttokovenko/battery-tool).
 
+## Unreleased
+
+### Changed
+
+- Dashboard shows the four modes (system, ready, daily, timed) as one exclusive row whose highlight follows the current mode, with the actions (set a plan, pause load, hand back to the system) in a separate row. The menu bar offers the same mode picker.
+
 ## [0.4.0-beta.2](https://github.com/hcy2206/battery-tool-plus/releases/tag/v0.4.0-beta.2) (2026-10-20)
 
 ### Fixed
