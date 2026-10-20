@@ -12,11 +12,15 @@ import Foundation
         var reading = Reading(percent: 60, health: 95, plugged: true, charging: true, cycles: 10)
         var plan = Plan(start: now.addingTimeInterval(-3600), deadline: now.addingTimeInterval(3600), goal: .desk)
         func decide(_ mode: Mode = .timed, at: Date? = nil, charging: Bool = true,
-                    idle: Double = 600, thermal: Int = 0, paused: Bool = false, reserve: Double = 7200) -> Decision {
+                    idle: Double = 600, thermal: Int = 0, paused: Bool = false, reserve: Double = 7200,
+                    stalled: Bool = false) -> Decision {
             Policy.decide(mode: mode, plan: plan, settings: settings, reading: reading,
-                          now: at ?? now, charging: charging, idle: idle, thermal: thermal, reserve: reserve, paused: paused)
+                          now: at ?? now, charging: charging, idle: idle, thermal: thermal, reserve: reserve,
+                          paused: paused, stalled: stalled)
         }
         check(decide().load == 1, "load while charging")
+        check(!decide(.daily, stalled: true).charging && !decide(stalled: true).charging, "stalled charge becomes the top of the cycle")
+        check(decide(.ready, stalled: true).charging, "ready mode ignores stall")
         check(decide(charging: false).load == 1, "load while discharging")
         check(decide(.daily).load == 0, "daily no load")
         check(decide(.ready).charging && decide(.ready).load == 0, "ready restores charge")
@@ -35,6 +39,7 @@ import Foundation
         plan.goal = .desk
         reading.percent = settings.minimum
         check(decide(charging: false).charging, "inclusive lower threshold")
+        check(decide(charging: true, stalled: true).charging, "stall never discharges below the minimum")
         reading.percent = settings.maximum
         check(!decide().charging, "inclusive upper threshold")
         reading.percent = 3

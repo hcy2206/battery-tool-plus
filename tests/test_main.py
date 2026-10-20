@@ -4,8 +4,9 @@ import pytest
 
 from tests.conftest import LEGACY_KEYS, TAHOE_FALLBACK_KEYS, TAHOE_KEYS
 
+from batterytool.battery import legacy_disable_charging, legacy_enable_charging
 from batterytool.logging import setup_logging
-from batterytool.loop import legacy_loop, tahoe_loop
+from batterytool.loop import CHARGE_STALL_SECONDS, SleepHold, _cycle_loop, legacy_loop, tahoe_loop
 from batterytool.main import main
 
 # Loop polls until health <= target, so every script ends on this row
@@ -165,6 +166,32 @@ def test_battery_percentage_uses_gauge_state_of_charge(hw, capfd):
     readings = [e for e in read_stderr_json(capfd) if e["event"] == "battery_reading"]
     assert readings[0]["battery_percentage"] == 80.0
     assert round(readings[0]["battery_health"], 1) == 86.1  # nominal / design under the fake backend
+
+
+def test_stalled_charge_becomes_top_of_cycle(hw):
+    """Permitted but absent charging for the stall window discharges from the current level"""
+    hw.set_keys(LEGACY_KEYS)
+    hw.script((80, 100, 100, 10, 0, 1), (80, 100, 100, 10, 0, 1), (80, 100, 100, 10, 0, 1), TARGET_ROW)
+    # First poll only enables charging; the stall timer starts on the second and expires on the third
+    ticks = iter([0.0, 0.0, CHARGE_STALL_SECONDS])
+
+    _cycle_loop(79, 95, 5, 0, setup_logging(), legacy_enable_charging, legacy_disable_charging,
+                sleep_hold=SleepHold(enabled=False), clock=lambda: next(ticks, CHARGE_STALL_SECONDS))
+
+    assert hw.writes() == LEGACY_ENABLE + LEGACY_DISABLE + LEGACY_ENABLE
+
+
+def test_sleep_is_disabled_only_while_discharging(hw):
+    """pmset disablesleep brackets the adapter cut and is restored on cleanup"""
+    hw.set_keys(LEGACY_KEYS)
+    hw.script((96, 100, 100, 10, 1, 1), TARGET_ROW)
+    calls = []
+
+    _cycle_loop(79, 95, 5, 0, setup_logging(), legacy_enable_charging, legacy_disable_charging,
+                sleep_hold=SleepHold(run=lambda args, **_: calls.append(args[-1]), enabled=True, settle=lambda: None))
+
+    assert calls == ["1", "0"]
+    assert hw.writes() == LEGACY_DISABLE + LEGACY_ENABLE
 
 
 def test_logs_to_file(hw, tmp_path):

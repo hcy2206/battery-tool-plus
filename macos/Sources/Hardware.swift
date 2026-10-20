@@ -1,5 +1,6 @@
 import Foundation
 import Darwin
+import IOKit
 import OSLog
 
 /// Percent is the gauge state of charge macOS displays (menu bar, pmset); health is the
@@ -16,7 +17,6 @@ func batteryReading(systemHealth: Double? = nil) -> Reading {
                    plugged: info.is_plugged_in, charging: info.is_charging, cycles: Int(info.cycle_count))
 }
 
-/// Charge-inhibit keys differ by firmware: CHTE (macOS 15.7–26), CH0B/CH0C (older),
 /// powerd's filtered "Maximum Capacity" is only handed to callers with a private entitlement;
 /// `system_profiler` is one, so its JSON is read in the background every few minutes.
 final class SystemHealthMonitor {
@@ -53,6 +53,7 @@ final class SystemHealthMonitor {
     }
 }
 
+/// Charge-inhibit keys differ by firmware: CHTE (macOS 15.7–26), CH0B/CH0C (older),
 /// none on the firmware shipped with macOS 27 and the 15.8 / 26.7 updates. The adapter
 /// cut-off key (CHIE, else CH0J/CH0I) is what actually drives the discharge phase, so
 /// cycling works with it alone; the inhibit keys are applied when the firmware has them.
@@ -81,6 +82,101 @@ func writeCharging(_ enabled: Bool) throws {
         }
     }
     if !failures.isEmpty { throw AppError.message("SMC 写入失败：" + failures.joined(separator: ", ")) }
+}
+
+/// Cutting the adapter puts the Mac on battery, and macOS then sleeps within seconds with the
+/// lid closed (clamshell) or after the battery idle timer otherwise; the app restores charging
+/// before any sleep, so a discharge phase could never progress. Power assertions do not stop
+/// clamshell sleep, so system sleep is switched off (`pmset disablesleep`) for the discharge
+/// phase and put back to the user's setting afterwards. The marker file records a hold that
+/// this helper owns, so a helper killed mid-phase is undone by the next one.
+///
+/// Re-enabling sleep the instant the adapter is restored runs the clamshell sleep that was
+/// raised while it was away (measured: display off at once, asleep five seconds later), so the
+/// release waits until IOKit reports the adapter and then a settle period.
+final class SleepHold {
+    static let settle: TimeInterval = 20
+    private let marker = "/var/run/batterytool-sleep-disabled"
+    private let userDisabled: Bool
+    private let lock = NSLock()
+    private var held = false
+    private var generation = 0
+    private let log = Logger(subsystem: "local.batterytool.manager", category: "sleep")
+    init() {
+        if FileManager.default.fileExists(atPath: marker) {
+            _ = SleepHold.pmset(disable: false)
+            unlink(marker)
+        }
+        userDisabled = SleepHold.registryBool(service: "IOPMrootDomain", key: "SleepDisabled")
+    }
+    func hold() throws {
+        lock.lock(); defer { lock.unlock() }
+        generation += 1
+        guard !held, !userDisabled else { return }
+        guard SleepHold.pmset(disable: true) else { throw AppError.message("无法在放电期间禁止系统睡眠（pmset disablesleep）") }
+        held = true
+        FileManager.default.createFile(atPath: marker, contents: nil, attributes: [.posixPermissions: 0o600])
+        log.notice("sleep disabled for discharge")
+    }
+    /// Immediate release: only for failure paths, where the adapter may not be back.
+    func release() {
+        lock.lock(); defer { lock.unlock() }
+        releaseLocked()
+    }
+    /// Blocks until the adapter is back and settled, then re-enables sleep.
+    func releaseSettled() {
+        lock.lock(); let token = generation; let active = held; lock.unlock()
+        guard active else { return }
+        let deadline = Date().addingTimeInterval(10)
+        while Date() < deadline, !SleepHold.adapterConnected() { Thread.sleep(forTimeInterval: 0.25) }
+        log.notice("adapter back, settling \(Int(SleepHold.settle), privacy: .public)s before re-enabling sleep")
+        Thread.sleep(forTimeInterval: SleepHold.settle)
+        lock.lock(); defer { lock.unlock() }
+        // A newer discharge took the hold again during the settle; keep it.
+        guard generation == token else { return }
+        releaseLocked()
+    }
+    /// Same as `releaseSettled` without blocking the caller (the command socket has a 2 s timeout).
+    func releaseSettledInBackground() {
+        DispatchQueue.global(qos: .userInitiated).async { self.releaseSettled() }
+    }
+    private func releaseLocked() {
+        guard held else { return }
+        if SleepHold.pmset(disable: false) { held = false; unlink(marker); log.notice("sleep re-enabled") }
+        else { log.error("Could not re-enable system sleep") }
+    }
+    static func adapterConnected() -> Bool {
+        registryBool(service: "AppleSmartBattery", key: "ExternalConnected")
+    }
+    static func registryBool(service: String, key: String) -> Bool {
+        let entry = IOServiceGetMatchingService(kIOMainPortDefault, IOServiceMatching(service))
+        guard entry != IO_OBJECT_NULL else { return false }
+        defer { IOObjectRelease(entry) }
+        let value = IORegistryEntryCreateCFProperty(entry, key as CFString, kCFAllocatorDefault, 0)?.takeRetainedValue()
+        return (value as? Bool) ?? false
+    }
+    private static func pmset(disable: Bool) -> Bool {
+        let process = Process()
+        process.executableURL = URL(fileURLWithPath: "/usr/bin/pmset")
+        process.arguments = ["disablesleep", disable ? "1" : "0"]
+        process.standardOutput = FileHandle.nullDevice
+        process.standardError = FileHandle.nullDevice
+        do { try process.run() } catch { return false }
+        process.waitUntilExit()
+        return process.terminationStatus == 0
+    }
+}
+
+/// Production power transitions: sleep is held before the adapter is cut and given back, settled,
+/// after it is restored, so the Mac is never left asleep-capable on battery or sleep-locked on AC.
+func applyPowerState(_ enabled: Bool, sleepHold: SleepHold) throws {
+    if enabled {
+        do { try writeCharging(true) } catch { sleepHold.release(); throw error }
+        sleepHold.releaseSettledInBackground()
+    } else {
+        try sleepHold.hold()
+        do { try writeCharging(false) } catch { sleepHold.release(); throw error }
+    }
 }
 
 private func socketAddress(_ path: String) -> sockaddr_un {
@@ -129,7 +225,13 @@ func runHelper(uid: uid_t, token: String) -> Int32 {
     guard lock >= 0 else { return 1 }
     defer { close(lock) }
     guard flock(lock, LOCK_EX | LOCK_NB) == 0 else { return 1 }
-    return servePowerCommands(uid: uid, token: token, path: "/var/run/batterytool-\(uid).sock", apply: writeCharging)
+    let sleepHold = SleepHold()
+    let status = servePowerCommands(uid: uid, token: token, path: "/var/run/batterytool-\(uid).sock") {
+        try applyPowerState($0, sleepHold: sleepHold)
+    }
+    // The process must not exit with sleep still disabled; the client already has its reply.
+    sleepHold.releaseSettled()
+    return status
 }
 
 /// Testable transport: production always supplies the fixed SMC implementation above.

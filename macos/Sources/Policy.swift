@@ -69,7 +69,7 @@ enum AppError: LocalizedError {
 struct Policy {
     static func decide(mode: Mode, plan: Plan?, settings: Settings, reading: Reading,
                        now: Date, charging: Bool, idle: Double, thermal: Int,
-                       reserve: TimeInterval, paused: Bool) -> Decision {
+                       reserve: TimeInterval, paused: Bool, stalled: Bool = false) -> Decision {
         func result(_ mode: Mode, _ charge: Bool, _ load: Double, _ why: String) -> Decision {
             Decision(mode: mode, charging: charge, load: load, reason: why)
         }
@@ -88,7 +88,10 @@ struct Policy {
             if now >= plan.deadline { activeMode = .daily }
             else if now < plan.start { return result(.timed, true, 0, "等待计划开始") }
         }
-        let charge = reading.percent <= settings.minimum ? true : (reading.percent >= settings.maximum ? false : charging)
+        // macOS may hold its own charge limit below `maximum` (no firmware key overrides it);
+        // a stalled charge phase then counts as the top of the cycle.
+        let charge = reading.percent <= settings.minimum ? true
+            : (reading.percent >= settings.maximum || stalled ? false : charging)
         guard activeMode == .timed else { return result(activeMode, charge, 0, "无额外负载，正常循环") }
         // System thermal states: nominal=0, fair=1, serious=2, critical=3.
         if thermal >= 2 { return result(.timed, true, 0, "系统温控保护，暂停负载") }

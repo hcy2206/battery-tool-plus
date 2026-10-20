@@ -39,6 +39,7 @@ import IOKit.pwr_mgt
     private var chargeSamples = [Observation]()
     private var lastPlanEvent = ""
     private var pendingCharge: (Date, Double)?
+    private var chargeStall: (Date, Double)?
     private var assertion: IOPMAssertionID = 0
     private var asserting = false
     private var sleeping = false
@@ -210,13 +211,23 @@ import IOKit.pwr_mgt
             let reserve = reserveEstimate(for: settings)
             reserveMinutes = reserve.0 / 60; reserveReason = reserve.1
             let effectiveIdle = now < startGrace ? 0 : idleSeconds
+            // Charging is permitted but the system is not charging and the level is flat:
+            // ten such minutes mean the system holds its own limit below `maximum`.
+            if (mode == .daily || mode == .timed) && charging && reading.plugged && !reading.charging
+                && reading.percent < settings.maximum {
+                if chargeStall.map({ reading.percent > $0.1 + 0.5 }) ?? true { chargeStall = (now, reading.percent) }
+            } else { chargeStall = nil }
+            let stalled = chargeStall.map { now.timeIntervalSince($0.0) >= 600 } ?? false
             let decision = Policy.decide(mode: mode, plan: plan, settings: settings, reading: reading, now: now,
                                          charging: charging, idle: effectiveIdle, thermal: now < thermalHoldUntil ? max(2, thermal) : thermal,
-                                         reserve: reserve.0, paused: paused)
+                                         reserve: reserve.0, paused: paused, stalled: stalled)
             if decision.mode != mode {
                 event("任务转换：\(decision.reason)")
                 mode = decision.mode
                 if mode != .timed { plan = nil }
+            }
+            if stalled && charging && !decision.charging {
+                event("系统已停止充电并停留在 \(Int(reading.percent.rounded()))%，以此作为本轮上限，开始放电")
             }
             reason = decision.reason
             charging = decision.charging
