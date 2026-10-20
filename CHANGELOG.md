@@ -12,6 +12,7 @@ This project is a fork of [BatteryTool](https://github.com/oresttokovenko/batter
 - Battery percentage and health now match what macOS displays. Percentage is the gauge state of charge (IOKit `CurrentCapacity`/`MaxCapacity`, as in the menu bar and `pmset`) instead of remaining ÷ nominal mAh, so the configured thresholds mean the same as the system's numbers. Health is the System Settings "Maximum Capacity" figure, read from `system_profiler SPPowerDataType -json` (the only public route to powerd's entitlement-gated value), falling back to nominal ÷ design capacity when unavailable. History samples recorded before this change use the old percentage basis.
 - A charge phase stuck below the configured maximum because macOS holds its own charge limit (80 % limit / optimized charging; `NotChargingReason` 0x1000000 on macOS 27, with no firmware key to override it) no longer blocks the cycle in the app or the CLI: after ten minutes of permitted-but-absent charging the current level becomes the top of the cycle and discharge begins.
 - A forced discharge ended itself after one poll as "charger unplugged": the SMC adapter cut-off clears IOKit `ExternalConnected` although the adapter is still attached. `is_plugged_in` now also counts a published adapter wattage (`AdapterDetails.Watts`), so the app and the CLI tell a cut-off from a real unplug.
+- Sidebar pages and mode cards respond to a click anywhere on the tile, not only on the text.
 
 ## [0.4.0](https://github.com/hcy2206/battery-tool-plus/releases/tag/v0.4.0) (2026-10-20)
 

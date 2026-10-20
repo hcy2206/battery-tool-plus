@@ -100,6 +100,7 @@ struct ManagerView: View {
                             .foregroundStyle(page == name ? Color.white : Color.primary)
                             .padding(.horizontal, 12).padding(.vertical, 10)
                             .background(page == name ? Color.accentColor : Color.clear, in: RoundedRectangle(cornerRadius: 8))
+                            .contentShape(RoundedRectangle(cornerRadius: 8))
                         }.buttonStyle(.plain)
                     }
                 }.padding(.top, 12)
@@ -215,6 +216,7 @@ struct ManagerView: View {
             .frame(maxWidth: .infinity, alignment: .leading)
             .padding(.horizontal, 12).padding(.vertical, 8)
             .background(selected ? Color.accentColor : Color.primary.opacity(0.06), in: RoundedRectangle(cornerRadius: 8))
+            .contentShape(RoundedRectangle(cornerRadius: 8))
         }.buttonStyle(.plain)
     }
     private var taskSettings: some View {
