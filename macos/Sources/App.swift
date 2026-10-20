@@ -8,15 +8,25 @@ typealias ViewState<Value> = SwiftUI.State<Value>
 
 final class AppDelegate: NSObject, NSApplicationDelegate {
     var controller: Controller?
+    func applicationDidFinishLaunching(_ notification: Notification) { DockPreference.apply() }
     func applicationShouldTerminateAfterLastWindowClosed(_ sender: NSApplication) -> Bool { false }
     func applicationWillTerminate(_ notification: Notification) { controller?.shutdown() }
+}
+/// Whether the application hides its Dock icon and lives only in the menu bar.
+enum DockPreference {
+    static let key = "hideDockIcon"
+    static var hidden: Bool { UserDefaults.standard.bool(forKey: key) }
+    static func apply() {
+        NSApp.setActivationPolicy(hidden ? .accessory : .regular)
+        NSApp.activate(ignoringOtherApps: true)
+    }
 }
 
 struct NativeApp: App {
     @NSApplicationDelegateAdaptor(AppDelegate.self) var delegate
     @StateObject private var model = Controller(demo: CommandLine.arguments.contains("--demo"))
     var body: some Scene {
-        WindowGroup("BatteryTool", id: "manager") {
+        WindowGroup("Battery Tool Plus", id: "manager") {
             ManagerView(model: model)
                 .onAppear { delegate.controller = model }
                 .frame(minWidth: 900, minHeight: 650)
@@ -26,7 +36,7 @@ struct NativeApp: App {
         }
         .defaultSize(width: 1060, height: 760)
         .commands { CommandGroup(replacing: .newItem) {} }
-        MenuBarExtra("BatteryTool · \(model.mode.title)", systemImage: batterySymbol(model.reading)) {
+        MenuBarExtra("Battery Tool Plus · \(model.mode.title)", systemImage: batterySymbol(model.reading)) {
             MenuControls(model: model)
         }
     }
@@ -64,6 +74,7 @@ struct ManagerView: View {
     @ViewState<Date> private var deadline = Date().addingTimeInterval(8*3600)
     @ViewState<DeadlineGoal> private var goal = DeadlineGoal.desk
     @ViewState<Bool> private var clearConfirmation = false
+    @AppStorage(DockPreference.key) private var hideDockIcon = false
     init(model: Controller, page: String = "控制台") {
         self.model = model
         self._page = ViewState(wrappedValue: page)
@@ -72,7 +83,7 @@ struct ManagerView: View {
     var body: some View {
         NavigationSplitView {
             VStack(alignment: .leading, spacing: 12) {
-                Label("BatteryTool", systemImage: "bolt.batteryblock.fill")
+                Label("Battery Tool Plus", systemImage: "bolt.batteryblock.fill")
                     .font(.title2.bold()).padding(.top, 12)
                 Text(model.demo ? "演示模式 · 不操作硬件" : "电池与负载管理").font(.caption).foregroundStyle(.secondary)
                 VStack(spacing: 6) {
@@ -93,7 +104,10 @@ struct ManagerView: View {
                     }
                 }.padding(.top, 12)
                 Spacer()
-                Text("关闭窗口后任务继续运行。\n退出应用会停止负载并恢复充电。")
+                Toggle("不在程序坞显示", isOn: $hideDockIcon)
+                    .toggleStyle(.switch).controlSize(.small)
+                    .onChange(of: hideDockIcon) { DockPreference.apply() }
+                Text("隐藏后从菜单栏图标打开窗口。\n关闭窗口后任务继续运行。\n退出应用会停止负载并恢复充电。")
                     .font(.caption).foregroundStyle(.secondary).padding(.bottom)
             }.padding(.horizontal, 12).navigationSplitViewColumnWidth(210)
         } detail: {

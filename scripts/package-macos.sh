@@ -13,16 +13,16 @@ STAGE=$(mktemp -d)
 trap 'rm -rf "$STAGE"' EXIT
 mkdir -p "$OUT" "$STAGE/$NAME"
 ./scripts/build-macos.sh
-codesign --verify --deep --strict dist/BatteryTool.app
-plutil -lint dist/BatteryTool.app/Contents/Info.plist
-MIN_OS=$(xcrun vtool -show-build dist/BatteryTool.app/Contents/MacOS/BatteryTool | awk '/minos/{print $2}')
+codesign --verify --deep --strict "dist/Battery Tool Plus.app"
+plutil -lint "dist/Battery Tool Plus.app/Contents/Info.plist"
+MIN_OS=$(xcrun vtool -show-build "dist/Battery Tool Plus.app/Contents/MacOS/BatteryTool" | awk '/minos/{print $2}')
 if [[ "$MIN_OS" != "15.0" ]]; then
     echo "Unexpected binary deployment target: $MIN_OS (expected 15.0)" >&2
     exit 1
 fi
 # Disk image root: the app next to an Applications link for drag-and-drop install; documents in a folder.
 DMG="$OUT/$NAME-macos-arm64.dmg"
-ditto dist/BatteryTool.app "$STAGE/$NAME/BatteryTool.app"
+ditto "dist/Battery Tool Plus.app" "$STAGE/$NAME/Battery Tool Plus.app"
 ln -s /Applications "$STAGE/$NAME/Applications"
 mkdir -p "$STAGE/$NAME/Documents"
 cp README.md LICENSE THIRD_PARTY_NOTICES.md RELEASE_NOTES.md "$STAGE/$NAME/Documents/"
@@ -34,7 +34,7 @@ codesign --force --sign - "$DMG"
 # Mount the image and verify the app inside it is the signed bundle that was built.
 MOUNT=$(hdiutil attach -nobrowse -readonly -noautoopen "$DMG" | awk -F '\t' '/\/Volumes\//{print $NF}')
 trap 'hdiutil detach -quiet "$MOUNT" || true; rm -rf "$STAGE"' EXIT
-codesign --verify --deep --strict "$MOUNT/BatteryTool.app"
+codesign --verify --deep --strict "$MOUNT/Battery Tool Plus.app"
 test -L "$MOUNT/Applications"
 hdiutil detach -quiet "$MOUNT"
 trap 'rm -rf "$STAGE"' EXIT

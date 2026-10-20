@@ -7,7 +7,12 @@ This project is a fork of [BatteryTool](https://github.com/oresttokovenko/batter
 
 ### Changed
 
+- The bundle is named `Battery Tool Plus.app` and the window, sidebar and menu bar use the product name; executable, bundle identifier and data directory are unchanged.
 - Dashboard shows the four modes (system, ready, daily, timed) as one exclusive row whose highlight follows the current mode, with the actions (set a plan, pause load, hand back to the system) in a separate row. The menu bar offers the same mode picker.
+
+### Added
+
+- Sidebar option to hide the Dock icon and keep the application in the menu bar only.
 
 ## [0.4.0-beta.2](https://github.com/hcy2206/battery-tool-plus/releases/tag/v0.4.0-beta.2) (2026-10-20)
 

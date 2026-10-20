@@ -110,4 +110,4 @@ macos-integration:
 
 [doc("Open the native app in demo mode (no battery writes or load)")]
 macos-demo: macos-build
-    open dist/BatteryTool.app --args --demo
+    open "dist/Battery Tool Plus.app" --args --demo

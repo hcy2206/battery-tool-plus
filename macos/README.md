@@ -4,7 +4,7 @@
 应用直接复用仓库中的 C/IOKit/SMC 层；Python CLI 继续可用。
 返回[项目首页](../README.md)或查看[开发指南](../CONTRIBUTING.md)。
 
-对外名称为 **Battery Tool Plus**；`BatteryTool.app`、可执行文件 `BatteryTool`、数据目录和
+应用名为 **Battery Tool Plus**（`Battery Tool Plus.app`）；可执行文件 `BatteryTool`、bundle 标识符、数据目录和
 `batterytool-control.lock` 沿用上游标识符。
 
 ## 构建与启动
@@ -13,7 +13,7 @@
 git clone https://github.com/hcy2206/battery-tool-plus.git
 cd battery-tool-plus
 ./scripts/build-macos.sh
-open dist/BatteryTool.app
+open "dist/Battery Tool Plus.app"
 ```
 
 构建产物为 ad-hoc 签名的应用，直接可用。通过 GitHub Release 分发的版本首次打开需要在
@@ -23,7 +23,7 @@ open dist/BatteryTool.app
 演示模式只渲染界面和模拟模式切换，不写 SMC，也不运行负载：
 
 ```bash
-open dist/BatteryTool.app --args --demo
+open "dist/Battery Tool Plus.app" --args --demo
 ```
 
 真实与演示模式的设置和历史分开保存；切换前先退出正在运行的应用。
@@ -88,7 +88,7 @@ open dist/BatteryTool.app --args --demo
 ./scripts/test-macos.sh             # 策略、预测和 SQLite 测试，无硬件访问
 ./scripts/test-macos-integration.sh # 演示控制器、IPC、工作进程生命周期和 SwiftUI 离屏渲染
 uv run pytest                      # Python/CFFI 回归与控制器互斥测试
-dist/BatteryTool.app/Contents/MacOS/BatteryTool --check-gpu   # 只编译 Metal 管线
+"dist/Battery Tool Plus.app/Contents/MacOS/BatteryTool" --check-gpu   # 只编译 Metal 管线
 swift scripts/make-icon.swift macos/AppIcon.icns              # 重新生成应用图标
 ```
 

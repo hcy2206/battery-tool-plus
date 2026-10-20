@@ -2,14 +2,14 @@
 set -euo pipefail
 cd "$(dirname "$0")/.."
 BUILD="$PWD/build/macos"
-APP="$PWD/dist/BatteryTool.app"
+APP="$PWD/dist/Battery Tool Plus.app"
 VERSION=$(awk -F '"' '/^version =/{print $2; exit}' pyproject.toml)
 # Python prerelease versions are mapped to numeric Apple bundle versions.
 APP_VERSION=$(printf '%s' "$VERSION" | sed -E 's/b[0-9]+$//')
 BUILD_VERSION=$(printf '%s' "$VERSION" | sed -nE 's/.*b([0-9]+)$/\1/p')
 BUILD_VERSION=${BUILD_VERSION:-1}
 if [[ "$(uname -m)" != "arm64" ]]; then
-    echo "BatteryTool requires Apple Silicon (arm64)." >&2
+    echo "Battery Tool Plus requires Apple Silicon (arm64)." >&2
     exit 1
 fi
 mkdir -p "$BUILD" "$APP/Contents/MacOS" "$APP/Contents/Resources"
@@ -27,7 +27,7 @@ cat > "$APP/Contents/Info.plist" <<PLIST
 <plist version="1.0"><dict>
 <key>CFBundleExecutable</key><string>BatteryTool</string>
 <key>CFBundleIdentifier</key><string>local.batterytool.manager</string>
-<key>CFBundleName</key><string>BatteryTool</string>
+<key>CFBundleName</key><string>Battery Tool Plus</string>
 <key>CFBundleDisplayName</key><string>Battery Tool Plus</string>
 <key>CFBundleIconFile</key><string>AppIcon</string>
 <key>CFBundlePackageType</key><string>APPL</string>

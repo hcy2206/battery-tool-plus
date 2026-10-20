@@ -168,7 +168,7 @@ import IOKit.pwr_mgt
         if active && !asserting {
             asserting = IOPMAssertionCreateWithName(kIOPMAssertionTypePreventUserIdleSystemSleep as CFString,
                                                    IOPMAssertionLevel(kIOPMAssertionLevelOn),
-                                                   "BatteryTool approved timed session" as CFString, &assertion) == kIOReturnSuccess
+                                                   "Battery Tool Plus approved timed session" as CFString, &assertion) == kIOReturnSuccess
         } else if !active && asserting {
             IOPMAssertionRelease(assertion); asserting = false
         }

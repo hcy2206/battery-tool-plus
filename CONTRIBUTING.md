@@ -6,8 +6,9 @@ Open issues and pull requests against the fork. Preserve upstream attribution,
 third-party license notices, and historical changelog links.
 
 The public project name is **Battery Tool Plus**. The Python distribution and CLI
-remain `battery-tool`, the module remains `batterytool`, and the native artifact
-remains `BatteryTool.app`. Use these actual identifiers in commands and paths;
+remain `battery-tool`, the module remains `batterytool`, and the native bundle is
+`Battery Tool Plus.app` (executable `BatteryTool`, data directory `BatteryTool/`).
+Use these actual identifiers in commands and paths;
 see the [README naming table](README.md#环境与命名).
 
 ## Commit messages
@@ -99,7 +100,7 @@ just check           # All checks
 ### Native macOS manager
 
 ```bash
-just macos-build         # Build dist/BatteryTool.app
+just macos-build         # Build "dist/Battery Tool Plus.app"
 just macos-test          # Pure policy, prediction and SQLite checks
 just macos-integration   # Demo controller/IPC/worker-lifetime checks and view renders
 just macos-demo          # Open the app without real battery writes or compute load

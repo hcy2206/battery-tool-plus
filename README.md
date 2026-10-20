@@ -51,7 +51,7 @@ macOS 27 路径已在 M2 Max（固件 20457.1.29）上实机确认读数与 `CHI
 | 仓库 | `hcy2206/battery-tool-plus` |
 | Python 包 / CLI 命令 | `battery-tool` |
 | Python 模块 | `batterytool` |
-| 应用文件 | `BatteryTool.app`（显示名 Battery Tool Plus） |
+| 应用文件 | `Battery Tool Plus.app`（可执行文件 `BatteryTool`） |
 | 本地数据目录 | `~/Library/Application Support/BatteryTool/` |
 
 PyPI 上的 `battery-tool` 是上游包，不包含本项目的图形应用与新增功能。请从 GitHub Releases 下载应用，或按下文从源码安装。
@@ -59,7 +59,7 @@ PyPI 上的 `battery-tool` 是上游包，不包含本项目的图形应用与�
 ## 下载与安装
 
 从 [GitHub Releases](https://github.com/hcy2206/battery-tool-plus/releases) 下载
-`BatteryToolPlus-<版本>-macos-arm64.dmg`，双击挂载后把 `BatteryTool.app` 拖到旁边的 Applications 快捷方式上。无需安装 Python 或 Xcode。
+`BatteryToolPlus-<版本>-macos-arm64.dmg`，双击挂载后把 `Battery Tool Plus.app` 拖到旁边的 Applications 快捷方式上。无需安装 Python 或 Xcode。
 
 Release 同时提供对应源码归档和 `SHA256SUMS`，把两者放在同一目录即可校验：
 
@@ -74,7 +74,7 @@ shasum -a 256 -c SHA256SUMS
 自行修改并重新构建后，用同样的 ad-hoc 方式签名即可运行：
 
 ```bash
-APP_PATH="/Applications/BatteryTool.app"
+APP_PATH="/Applications/Battery Tool Plus.app"
 codesign --force --deep --sign - "$APP_PATH"
 codesign --verify --deep --strict --verbose=2 "$APP_PATH"
 open "$APP_PATH"
@@ -86,7 +86,7 @@ open "$APP_PATH"
 git clone https://github.com/hcy2206/battery-tool-plus.git
 cd battery-tool-plus
 ./scripts/build-macos.sh
-open dist/BatteryTool.app
+open "dist/Battery Tool Plus.app"
 ```
 
 应用启动后默认交给系统管理电池。点击“授权电池控制”完成一次管理员授权，然后选择模式或确认定时任务。
@@ -94,7 +94,7 @@ open dist/BatteryTool.app
 演示模式只渲染界面和模拟模式切换，不写入电池，也不运行负载：
 
 ```bash
-open dist/BatteryTool.app --args --demo
+open "dist/Battery Tool Plus.app" --args --demo
 ```
 
 切换真实与演示模式前先退出正在运行的应用。完整说明见 [macOS 管理应用](macos/README.md)。
