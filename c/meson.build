@@ -14,6 +14,8 @@ cffi_generated = custom_target(
     meson.current_source_dir() / 'build_iokit.py',
     '@OUTPUT@',
   ],
+  # The cdef lives in the script; regenerate when the struct changes.
+  depend_files: files('build_iokit.py', 'power_sources.h', 'smc_wrapper.h'),
 )
 
 # Compile CFFI-generated code + C sources into extension
@@ -40,6 +42,7 @@ cffi_generated_fake = custom_target(
     '@OUTPUT@',
     'iokit_wrapper_fake',
   ],
+  depend_files: files('build_iokit.py', 'power_sources.h', 'smc_wrapper.h'),
 )
 
 py.extension_module(

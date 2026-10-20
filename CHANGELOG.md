@@ -3,6 +3,12 @@
 Repository: [hcy2206/battery-tool-plus](https://github.com/hcy2206/battery-tool-plus).
 This project is a fork of [BatteryTool](https://github.com/oresttokovenko/battery-tool).
 
+## Unreleased
+
+### Fixed
+
+- The CFFI code generator is declared as a build input, so a `BatteryInfo` struct change regenerates the extension sources instead of failing with a field-offset error.
+
 ## [0.4.0](https://github.com/hcy2206/battery-tool-plus/releases/tag/v0.4.0) (2026-10-20)
 
 ### Changed
