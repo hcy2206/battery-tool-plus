@@ -88,6 +88,46 @@ class SleepHold:
         self._held = False
 
 
+class DisplayHold:
+    """Keep the display awake for the whole cycle.
+
+    With the lid closed, macOS lights an external display only while external
+    power is present; during a discharge the cut adapter does not count, so a
+    display that idled off stays dark until charging resumes. ``caffeinate -d``
+    tied to this process holds a prevent-display-sleep assertion; it exits with
+    the loop or, via ``-w``, if the loop dies.
+    """
+
+    def __init__(self, enabled: bool | None = None):
+        self._enabled = (not os.environ.get("BATTERYTOOL_FAKE")) if enabled is None else enabled
+        self._process: subprocess.Popen[bytes] | None = None
+
+    def hold(self) -> None:
+        """Start caffeinate unless already running or disabled."""
+        if not self._enabled or self._process is not None:
+            return
+        try:
+            self._process = subprocess.Popen(
+                ["/usr/bin/caffeinate", "-d", "-w", str(os.getpid())],
+                stdin=subprocess.DEVNULL,
+                stdout=subprocess.DEVNULL,
+                stderr=subprocess.DEVNULL,
+            )
+        except OSError:
+            self._process = None
+
+    def release(self) -> None:
+        """Stop caffeinate so the display may sleep again."""
+        if self._process is None:
+            return
+        self._process.terminate()
+        try:
+            self._process.wait(timeout=5)
+        except subprocess.TimeoutExpired:
+            self._process.kill()
+        self._process = None
+
+
 def _cycle_loop(
     target_health: int,
     max_charge: int,
@@ -97,14 +137,17 @@ def _cycle_loop(
     enable_charging: Callable[[], None],
     disable_charging: Callable[[], None],
     sleep_hold: SleepHold | None = None,
+    display_hold: DisplayHold | None = None,
     clock: Callable[[], float] = time.monotonic,
 ) -> bool:
     charging_enabled: bool | None = None
     stall_since: float | None = None
     stall_level = 0.0
     sleep_hold = sleep_hold or SleepHold()
+    display_hold = display_hold or DisplayHold()
 
     success = True
+    display_hold.hold()
     try:
         while True:
             battery_info = fetch_battery_info()
@@ -184,6 +227,7 @@ def _cycle_loop(
         except Exception as e:
             success = False
             logger.exception("sleep_restore_failed", error=str(e))
+        display_hold.release()
     return success
 
 
