@@ -5,7 +5,11 @@
  * per line:
  *
  *   <current_mAh> <max_mAh> <design_mAh> <cycle_count> <is_charging>
- * <is_plugged_in>
+ * <is_plugged_in> [<state_of_charge>]
+ *
+ * The optional seventh column is the gauge percentage macOS displays; when
+ * absent it defaults to current_mAh / max_mAh so older scripts keep their
+ * meaning.
  *
  * Each call consumes the row at the position stored in battery_cursor
  * (created on first call), so a test can script a sequence of readings
@@ -76,12 +80,22 @@ BatteryInfo FetchBatteryInfo(void) {
 
   /* Past the end of the script, keep returning the final row. */
   const char* row = selected[0] != '\0' ? selected : last;
-  int charging = 0, plugged = 0;
-  if (sscanf(row, "%d %d %d %d %d %d", &info.current_capacity,
-             &info.max_capacity, &info.design_capacity, &info.cycle_count,
-             &charging, &plugged) == 6) {
+  int charging = 0, plugged = 0, soc = -1;
+  int fields = sscanf(row, "%d %d %d %d %d %d %d", &info.current_capacity,
+                      &info.max_capacity, &info.design_capacity,
+                      &info.cycle_count, &charging, &plugged, &soc);
+  if (fields >= 6) {
     info.is_charging = charging != 0;
     info.is_plugged_in = plugged != 0;
+    if (fields == 7) {
+      info.state_of_charge = soc;
+    } else if (info.max_capacity > 0) {
+      info.state_of_charge = info.current_capacity * 100 / info.max_capacity;
+    } else {
+      info.state_of_charge = -1;
+    }
+  } else {
+    info.state_of_charge = -1;
   }
 
   write_cursor(dir, cursor + 1);

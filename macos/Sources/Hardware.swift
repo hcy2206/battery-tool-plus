@@ -2,17 +2,57 @@ import Foundation
 import Darwin
 import OSLog
 
-func batteryReading() -> Reading {
+/// Percent is the gauge state of charge macOS displays (menu bar, pmset); health is the
+/// System Settings "Maximum Capacity" when `SystemHealthMonitor` has it, else nominal/design.
+func batteryReading(systemHealth: Double? = nil) -> Reading {
     let info = FetchBatteryInfo()
     guard info.max_capacity > 0, info.design_capacity > 0 else {
         return Reading(percent: -1, health: 0, plugged: false, charging: false, cycles: 0)
     }
-    return Reading(percent: Double(info.current_capacity) / Double(info.max_capacity) * 100,
-                   health: Double(info.max_capacity) / Double(info.design_capacity) * 100,
+    let gauge = (0...100).contains(info.state_of_charge) ? Double(info.state_of_charge)
+        : Double(info.current_capacity) / Double(info.max_capacity) * 100
+    return Reading(percent: gauge,
+                   health: systemHealth ?? Double(info.max_capacity) / Double(info.design_capacity) * 100,
                    plugged: info.is_plugged_in, charging: info.is_charging, cycles: Int(info.cycle_count))
 }
 
 /// Charge-inhibit keys differ by firmware: CHTE (macOS 15.7–26), CH0B/CH0C (older),
+/// powerd's filtered "Maximum Capacity" is only handed to callers with a private entitlement;
+/// `system_profiler` is one, so its JSON is read in the background every few minutes.
+final class SystemHealthMonitor {
+    private(set) var value: Double?
+    private var refreshed = Date.distantPast
+    private var running = false
+    func refreshIfStale(interval: TimeInterval = 300) {
+        guard !running, Date().timeIntervalSince(refreshed) >= interval else { return }
+        running = true
+        DispatchQueue.global(qos: .utility).async {
+            let health = SystemHealthMonitor.read()
+            DispatchQueue.main.async { self.value = health ?? self.value; self.refreshed = Date(); self.running = false }
+        }
+    }
+    static func read() -> Double? {
+        let process = Process()
+        process.executableURL = URL(fileURLWithPath: "/usr/sbin/system_profiler")
+        process.arguments = ["SPPowerDataType", "-json"]
+        let pipe = Pipe()
+        process.standardOutput = pipe
+        process.standardError = FileHandle.nullDevice
+        do { try process.run() } catch { return nil }
+        let data = pipe.fileHandleForReading.readDataToEndOfFile()
+        process.waitUntilExit()
+        guard process.terminationStatus == 0,
+              let root = try? JSONSerialization.jsonObject(with: data) as? [String: Any],
+              let entries = root["SPPowerDataType"] as? [[String: Any]] else { return nil }
+        for entry in entries {
+            guard let text = (entry["sppower_battery_health_info"] as? [String: Any])?["sppower_battery_health_maximum_capacity"] as? String,
+                  text.hasSuffix("%"), let value = Double(text.dropLast()), value > 0, value <= 100 else { continue }
+            return value
+        }
+        return nil
+    }
+}
+
 /// none on the firmware shipped with macOS 27 and the 15.8 / 26.7 updates. The adapter
 /// cut-off key (CHIE, else CH0J/CH0I) is what actually drives the discharge phase, so
 /// cycling works with it alone; the inhibit keys are applied when the firmware has them.

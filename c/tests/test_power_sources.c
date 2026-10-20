@@ -25,6 +25,7 @@ static void TestFetchBatteryInfo(void** state) {
   assert_true(info.design_capacity > 0);
   assert_true(info.cycle_count >= 0);
   assert_true(health >= 1 && health <= 100);
+  assert_true(info.state_of_charge >= 0 && info.state_of_charge <= 100);
 }
 
 int main(void) {

@@ -14,6 +14,7 @@ ffibuilder.cdef("""
         MilliampHours max_capacity;
         MilliampHours design_capacity;
         int cycle_count;
+        int state_of_charge;
         bool is_charging;
         bool is_plugged_in;
     } BatteryInfo;

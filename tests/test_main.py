@@ -155,6 +155,18 @@ def test_battery_reading_contains_all_metrics(hw, capfd):
     assert "charging_enabled" in reading
 
 
+def test_battery_percentage_uses_gauge_state_of_charge(hw, capfd):
+    """The gauge percentage macOS displays wins over the mAh ratio when the row supplies it"""
+    hw.set_keys(LEGACY_KEYS)
+    hw.script((3895, 5231, 6075, 151, 0, 1, 80), TARGET_ROW)
+
+    run_legacy()
+
+    readings = [e for e in read_stderr_json(capfd) if e["event"] == "battery_reading"]
+    assert readings[0]["battery_percentage"] == 80.0
+    assert round(readings[0]["battery_health"], 1) == 86.1  # nominal / design under the fake backend
+
+
 def test_logs_to_file(hw, tmp_path):
     hw.set_keys(LEGACY_KEYS)
     hw.script(TARGET_ROW)

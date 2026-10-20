@@ -26,6 +26,7 @@ import IOKit.pwr_mgt
     let demo: Bool
     private let hardware = HardwareClient()
     private let load = LoadManager()
+    private let systemHealth = SystemHealthMonitor()
     private var history: History?
     private var timer: Timer?
     private var observers = [NSObjectProtocol]()
@@ -198,7 +199,9 @@ import IOKit.pwr_mgt
         if demo { idleSeconds = 600 }
         thermal = demo ? 0 : ProcessInfo.processInfo.thermalState.rawValue
         if thermal >= 2 { thermalHoldUntil = now.addingTimeInterval(60) }
-        reading = demo ? Reading(percent: 64, health: 91, plugged: true, charging: charging, cycles: 182) : batteryReading()
+        if !demo { systemHealth.refreshIfStale() }
+        reading = demo ? Reading(percent: 64, health: 91, plugged: true, charging: charging, cycles: 182)
+            : batteryReading(systemHealth: systemHealth.value)
         do {
             let settings = runtimeSettings
             try settings.validate()

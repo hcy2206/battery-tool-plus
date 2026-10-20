@@ -8,6 +8,7 @@ from batterytool.battery import (
     adapter_enable_charging,
     fetch_battery_info,
     legacy_disable_charging,
+    battery_reading,
     legacy_enable_charging,
     tahoe_disable_charging,
     tahoe_enable_charging,
@@ -35,8 +36,7 @@ def _cycle_loop(
                 success = False
                 break
 
-            battery_percentage = battery_info.current_capacity / battery_info.max_capacity * 100
-            battery_health = battery_info.max_capacity / battery_info.design_capacity * 100
+            battery_percentage, battery_health = battery_reading(battery_info)
 
             logger.info(
                 "battery_reading",

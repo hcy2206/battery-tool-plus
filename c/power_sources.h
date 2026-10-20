@@ -10,6 +10,8 @@ typedef struct {
   MilliampHours max_capacity;
   MilliampHours design_capacity;
   int cycle_count;
+  /* Gauge state of charge, 0-100, as shown by macOS; -1 when unavailable. */
+  int state_of_charge;
   bool is_charging;
   bool is_plugged_in;
 } BatteryInfo;

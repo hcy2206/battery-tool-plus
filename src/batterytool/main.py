@@ -3,7 +3,7 @@ from typing import TYPE_CHECKING, Annotated
 
 import typer
 
-from batterytool.battery import detect_charge_control, fetch_battery_info, is_apple_silicon
+from batterytool.battery import battery_reading, detect_charge_control, fetch_battery_info, is_apple_silicon
 from batterytool.locking import hardware_lock
 from batterytool.logging import setup_logging
 from batterytool.loop import adapter_loop, legacy_loop, tahoe_loop
@@ -47,8 +47,7 @@ def main(
         logger.error("invalid_battery_data", message="Failed to read valid battery capacity from IOKit")
         raise typer.Exit(1)
 
-    battery_percentage = battery_info.current_capacity / battery_info.max_capacity * 100
-    battery_health = battery_info.max_capacity / battery_info.design_capacity * 100
+    battery_percentage, battery_health = battery_reading(battery_info)
 
     if status:
         logger.info(

@@ -48,10 +48,16 @@ Adapter-only firmware (macOS 27, and the firmware shipped with 15.8 / 26.7):
   is what drives the discharge phase anyway, so cycling runs on CHIE alone.
 """
 
+import json
 import os
 import platform
+import subprocess
+from typing import TYPE_CHECKING
 
 from batterytool.constants import SMCKeys, SMCValues
+
+if TYPE_CHECKING:
+    from batterytool.iokit_wrapper import BatteryInfo
 
 # BATTERYTOOL_FAKE swaps in the file-backed fake backend (see c/smc_fake.c),
 # so the whole package can run in tests/CI/VMs without touching the SMC
@@ -64,6 +70,51 @@ else:
 def fetch_battery_info():
     """Fetch current battery info from IOKit via CFFI"""
     return lib.FetchBatteryInfo()
+
+
+def system_battery_health() -> float | None:
+    """The "Maximum Capacity" percentage shown in System Settings.
+
+    powerd computes it with its own filtered algorithm and only hands it to
+    callers holding a private entitlement; ``system_profiler`` is such a
+    caller, so its JSON output is the one public route to the same number.
+    Returns None when unavailable (including under the fake backend).
+    """
+    if os.environ.get("BATTERYTOOL_FAKE"):
+        return None
+    try:
+        output = subprocess.run(
+            ["/usr/sbin/system_profiler", "SPPowerDataType", "-json"],
+            capture_output=True,
+            text=True,
+            timeout=10,
+            check=True,
+        ).stdout
+        for entry in json.loads(output).get("SPPowerDataType", []):
+            text = entry.get("sppower_battery_health_info", {}).get("sppower_battery_health_maximum_capacity")
+            if isinstance(text, str) and text.endswith("%"):
+                value = float(text[:-1])
+                if 0 < value <= 100:
+                    return value
+    except (OSError, subprocess.SubprocessError, ValueError):
+        pass
+    return None
+
+
+def battery_reading(info: "BatteryInfo") -> tuple[float, float]:
+    """(percentage, health) as macOS displays them.
+
+    Percentage is the gauge state of charge (menu bar / pmset); health is the
+    System Settings figure when readable, else nominal / design capacity. The
+    caller has already checked that max and design capacity are positive.
+    """
+    percentage = info.current_capacity / info.max_capacity * 100
+    if 0 <= info.state_of_charge <= 100:
+        percentage = float(info.state_of_charge)
+    health = system_battery_health()
+    if health is None:
+        health = info.max_capacity / info.design_capacity * 100
+    return percentage, health
 
 
 def is_apple_silicon() -> bool:

@@ -134,15 +134,17 @@ static void TestWriteWrongSizeFails(void** state) {
 static void TestBatteryScriptYieldsRowsInOrderThenRepeatsLast(void** state) {
   (void)state;
 
-  WriteFile("battery_script", "96 100 100 10 1 1\n4 100 100 10 0 1\n");
+  WriteFile("battery_script", "96 100 100 10 1 1\n4 100 100 10 0 1 7\n");
 
   BatteryInfo first = FetchBatteryInfo();
   assert_int_equal(first.current_capacity, 96);
+  assert_int_equal(first.state_of_charge, 96);  // defaults to the mAh ratio
   assert_true(first.is_charging);
   assert_true(first.is_plugged_in);
 
   BatteryInfo second = FetchBatteryInfo();
   assert_int_equal(second.current_capacity, 4);
+  assert_int_equal(second.state_of_charge, 7);  // explicit gauge column wins
   assert_false(second.is_charging);
 
   BatteryInfo third = FetchBatteryInfo();

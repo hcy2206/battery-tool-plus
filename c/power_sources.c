@@ -14,6 +14,12 @@ static const char kCycleCountKey[] = "CycleCount";
 static const char kIsChargingKey[] = "IsCharging";
 static const char kExternalConnectedKey[] = "ExternalConnected";
 
+// The gauge's own state of charge: what the menu bar, pmset and System
+// Settings display. Top-level CurrentCapacity/MaxCapacity are percentage
+// based on Apple Silicon (MaxCapacity is 100), unlike the mAh figures above.
+static const char kGaugeCurrentKey[] = "CurrentCapacity";
+static const char kGaugeMaxKey[] = "MaxCapacity";
+
 // Newer firmware (macOS 27 and the 15.8 / 26.7 firmware updates) moves the
 // capacity figures into this nested dictionary and renames the raw current
 // capacity, so each integer is looked up at the top level first and then here.
@@ -98,6 +104,17 @@ BatteryInfo FetchBatteryInfo(void) {
                   kCFNumberIntType))
     fprintf(stderr, "batterytool: failed to read IOKit key '%s'\n",
             kCycleCountKey);
+  int gauge_current = 0, gauge_max = 0;
+  info.state_of_charge = -1;
+  if (GetDictInt(properties, kGaugeCurrentKey, &gauge_current,
+                 kCFNumberIntType) &&
+      GetDictInt(properties, kGaugeMaxKey, &gauge_max, kCFNumberIntType) &&
+      gauge_max > 0 && gauge_current >= 0 && gauge_current <= gauge_max) {
+    info.state_of_charge = gauge_current * 100 / gauge_max;
+  } else {
+    fprintf(stderr, "batterytool: failed to read IOKit key '%s'\n",
+            kGaugeCurrentKey);
+  }
   if (!GetDictBool(properties, kIsChargingKey, &info.is_charging))
     fprintf(stderr, "batterytool: failed to read IOKit key '%s'\n",
             kIsChargingKey);

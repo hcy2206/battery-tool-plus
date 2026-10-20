@@ -44,6 +44,10 @@
 
 macOS 27 路径已在 M2 Max（固件 20457.1.29）上实机确认读数与 `CHIE` 可用；前两条路径沿用上游实现，由模拟后端的回归测试覆盖写入序列。
 
+电量与健康度读数与系统一致：电量取电量计上报的百分比（IOKit `CurrentCapacity`/`MaxCapacity`，与菜单栏、`pmset -g batt` 相同），
+健康度取系统设置中的"最大容量"（通过 `system_profiler SPPowerDataType -json` 读取；该值由 powerd 自行计算，无法从公开键推出），
+读不到时回退为标称容量 ÷ 设计容量。
+
 对外名称为 **Battery Tool Plus**，代码中的标识符沿用上游：
 
 | 项目 | 实际名称 |

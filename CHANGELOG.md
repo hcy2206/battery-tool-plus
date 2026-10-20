@@ -8,6 +8,7 @@ This project is a fork of [BatteryTool](https://github.com/oresttokovenko/batter
 ### Fixed
 
 - The CFFI code generator is declared as a build input, so a `BatteryInfo` struct change regenerates the extension sources instead of failing with a field-offset error.
+- Battery percentage and health now match what macOS displays. Percentage is the gauge state of charge (IOKit `CurrentCapacity`/`MaxCapacity`, as in the menu bar and `pmset`) instead of remaining ÷ nominal mAh, so the configured thresholds mean the same as the system's numbers. Health is the System Settings "Maximum Capacity" figure, read from `system_profiler SPPowerDataType -json` (the only public route to powerd's entitlement-gated value), falling back to nominal ÷ design capacity when unavailable. History samples recorded before this change use the old percentage basis.
 
 ## [0.4.0](https://github.com/hcy2206/battery-tool-plus/releases/tag/v0.4.0) (2026-10-20)
 

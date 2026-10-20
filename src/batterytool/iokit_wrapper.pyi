@@ -7,6 +7,7 @@ class BatteryInfo(Protocol):
     max_capacity: int
     design_capacity: int
     cycle_count: int
+    state_of_charge: int
     is_charging: bool
     is_plugged_in: bool
 
