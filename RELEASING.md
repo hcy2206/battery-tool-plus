@@ -4,8 +4,8 @@
 
 ## 版本与准备
 
-- 同步修改 `pyproject.toml`、`meson.build` 的版本（如 `0.4.0b1`），运行 `uv lock` 更新锁文件。
-- 标签和附件使用 `v0.4.0-beta.1` / `0.4.0-beta.1`。
+- 同步修改 `pyproject.toml`、`meson.build` 的版本（如 `0.4.0b2`），运行 `uv lock` 更新锁文件。
+- 标签和附件使用 `v<版本>` / `<版本>`，如 `v0.4.0-beta.2` / `0.4.0-beta.2`；下文以 `v0.4.0-beta.2` 为例。
 - 构建脚本把版本映射为 CFBundleShortVersionString `0.4.0`、CFBundleVersion `1`；
   后续 beta 递增 b 后的数字，正式版前把构建号改为持续递增。
 - 更新 CHANGELOG、RELEASE_NOTES 和 README。
@@ -19,11 +19,11 @@
 ```bash
 ./scripts/package-macos.sh
 (cd dist/release && shasum -a 256 -c SHA256SUMS)
-git tag -a v0.4.0-beta.1 -m 'Battery Tool Plus v0.4.0-beta.1'
-git push origin main v0.4.0-beta.1
-gh release create v0.4.0-beta.1 dist/release/* \
+git tag -a v0.4.0-beta.2 -m 'Battery Tool Plus v0.4.0-beta.2'
+git push origin main v0.4.0-beta.2
+gh release create v0.4.0-beta.2 dist/release/* \
   --verify-tag --draft --prerelease \
-  --title 'Battery Tool Plus v0.4.0-beta.1' --notes-file RELEASE_NOTES.md
+  --title 'Battery Tool Plus v0.4.0-beta.2' --notes-file RELEASE_NOTES.md
 ```
 
 脚本构建应用、校验签名、plist 和部署目标，生成应用 DMG（含 Applications 快捷方式，挂载校验后再推出）、对应 HEAD 的源码 tar.gz 和 SHA256SUMS；
@@ -31,7 +31,7 @@ gh release create v0.4.0-beta.1 dist/release/* \
 已发布的标签和文件不要覆盖。核对草稿后公开：
 
 ```bash
-gh release edit v0.4.0-beta.1 --draft=false --prerelease --latest=false
+gh release edit v0.4.0-beta.2 --draft=false --prerelease --latest=false
 ```
 
 ## GitHub Actions 方式
