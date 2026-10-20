@@ -13,6 +13,7 @@ This project is a fork of [BatteryTool](https://github.com/oresttokovenko/batter
 - A charge phase stuck below the configured maximum because macOS holds its own charge limit (80 % limit / optimized charging; `NotChargingReason` 0x1000000 on macOS 27, with no firmware key to override it) no longer blocks the cycle in the app or the CLI: after ten minutes of permitted-but-absent charging the current level becomes the top of the cycle and discharge begins.
 - A forced discharge ended itself after one poll as "charger unplugged": the SMC adapter cut-off clears IOKit `ExternalConnected` although the adapter is still attached. `is_plugged_in` now also counts a published adapter wattage (`AdapterDetails.Watts`), so the app and the CLI tell a cut-off from a real unplug.
 - Sidebar pages and mode cards respond to a click anywhere on the tile, not only on the text.
+- GPU load reached only ~24 % of the requested level: each 65536-thread batch ran for ~0.6 ms, so submission latency and the 1 ms sleep floor dominated. Batches are now 4 M threads, two command buffers are kept in flight, and the duty cycle is computed from the GPU's own timestamps.
 
 ## [0.4.0](https://github.com/hcy2206/battery-tool-plus/releases/tag/v0.4.0) (2026-10-20)
 

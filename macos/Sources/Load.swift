@@ -40,30 +40,46 @@ func runLoadWorker(kind: String, intensity: Double, threads: Int) -> Int32 {
     } else if kind == "gpu" {
         guard let device = MTLCreateSystemDefaultDevice(), let queue = device.makeCommandQueue() else { return 2 }
         do {
-            guard let buffer = device.makeBuffer(length: 65536 * MemoryLayout<Float>.size, options: .storageModeShared)
+            guard let buffer = device.makeBuffer(length: gpuLoadThreads * MemoryLayout<Float>.size, options: .storageModeShared)
             else { return 2 }
             let pipeline = try makeLoadPipeline(device: device)
             DispatchQueue.global(qos: .userInitiated).async {
-                while true {
-                    autoreleasepool {
-                        let start = ProcessInfo.processInfo.systemUptime
-                        guard let command = queue.makeCommandBuffer(), let encoder = command.makeComputeCommandEncoder() else { exit(2) }
-                        encoder.setComputePipelineState(pipeline)
-                        encoder.setBuffer(buffer, offset: 0, index: 0)
-                        encoder.dispatchThreads(MTLSize(width: 65536, height: 1, depth: 1),
-                                                threadsPerThreadgroup: MTLSize(width: min(256, pipeline.maxTotalThreadsPerThreadgroup), height: 1, depth: 1))
-                        encoder.endEncoding()
-                        command.commit()
-                        command.waitUntilCompleted()
-                        if command.status == .error { exit(2) }
-                        let elapsed = ProcessInfo.processInfo.systemUptime - start
-                        Thread.sleep(forTimeInterval: max(0.001, min(1, elapsed * (1 - intensity) / intensity)))
-                    }
-                }
+                runGPULoad(queue: queue, pipeline: pipeline, buffer: buffer, intensity: intensity)
             }
         } catch { return 2 }
     } else { return 1 }
     return waitForLoadLease()
+}
+
+/// A batch must keep the GPU busy for tens of milliseconds: a 65536-thread dispatch finished in
+/// ~0.6 ms on an M2 Max, so submission latency and the sleep floor dominated and the GPU sat at
+/// ~24 % while asked for 80 %. Two command buffers are committed back to back so the GPU does not
+/// idle while the CPU encodes, and the duty cycle is taken from the GPU's own timestamps.
+let gpuLoadThreads = 1 << 22
+func runGPULoad(queue: MTLCommandQueue, pipeline: MTLComputePipelineState, buffer: MTLBuffer, intensity: Double) -> Never {
+    let threadgroup = MTLSize(width: min(256, pipeline.maxTotalThreadsPerThreadgroup), height: 1, depth: 1)
+    while true {
+        autoreleasepool {
+            var commands = [MTLCommandBuffer]()
+            for _ in 0..<2 {
+                guard let command = queue.makeCommandBuffer(), let encoder = command.makeComputeCommandEncoder() else { exit(2) }
+                encoder.setComputePipelineState(pipeline)
+                encoder.setBuffer(buffer, offset: 0, index: 0)
+                encoder.dispatchThreads(MTLSize(width: gpuLoadThreads, height: 1, depth: 1), threadsPerThreadgroup: threadgroup)
+                encoder.endEncoding()
+                command.commit()
+                commands.append(command)
+            }
+            let submitted = ProcessInfo.processInfo.systemUptime
+            for command in commands {
+                command.waitUntilCompleted()
+                if command.status == .error { exit(2) }
+            }
+            let busy = commands[1].gpuEndTime - commands[0].gpuStartTime
+            let elapsed = busy > 0 ? busy : ProcessInfo.processInfo.systemUptime - submitted
+            if intensity < 1 { Thread.sleep(forTimeInterval: elapsed * (1 - intensity) / intensity) }
+        }
+    }
 }
 
 /// Shared by real load workers and a computation-free lifecycle probe.
