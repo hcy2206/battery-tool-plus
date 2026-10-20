@@ -20,6 +20,12 @@ static const char kExternalConnectedKey[] = "ExternalConnected";
 static const char kGaugeCurrentKey[] = "CurrentCapacity";
 static const char kGaugeMaxKey[] = "MaxCapacity";
 
+// Cutting the adapter through the SMC (CHIE/CH0I) clears ExternalConnected
+// even though the adapter is still attached; its negotiated wattage stays
+// published, so that is what tells a forced discharge from a real unplug.
+static const char kAdapterDetailsKey[] = "AdapterDetails";
+static const char kAdapterWattsKey[] = "Watts";
+
 // Newer firmware (macOS 27 and the 15.8 / 26.7 firmware updates) moves the
 // capacity figures into this nested dictionary and renames the raw current
 // capacity, so each integer is looked up at the top level first and then here.
@@ -104,6 +110,25 @@ BatteryInfo FetchBatteryInfo(void) {
                   kCFNumberIntType))
     fprintf(stderr, "batterytool: failed to read IOKit key '%s'\n",
             kCycleCountKey);
+  if (!GetDictBool(properties, kIsChargingKey, &info.is_charging))
+    fprintf(stderr, "batterytool: failed to read IOKit key '%s'\n",
+            kIsChargingKey);
+  if (!GetDictBool(properties, kExternalConnectedKey, &info.is_plugged_in))
+    fprintf(stderr, "batterytool: failed to read IOKit key '%s'\n",
+            kExternalConnectedKey);
+  if (!info.is_plugged_in) {
+    CFStringRef cf_key = CFStringCreateWithCString(NULL, kAdapterDetailsKey,
+                                                   kCFStringEncodingUTF8);
+    CFDictionaryRef adapter = CFDictionaryGetValue(properties, cf_key);
+    CFRelease(cf_key);
+    int watts = 0;
+    if (adapter != NULL && CFGetTypeID(adapter) == CFDictionaryGetTypeID() &&
+        GetDictInt(adapter, kAdapterWattsKey, &watts, kCFNumberIntType) &&
+        watts > 0) {
+      info.is_plugged_in = true;
+    }
+  }
+
   int gauge_current = 0, gauge_max = 0;
   info.state_of_charge = -1;
   if (GetDictInt(properties, kGaugeCurrentKey, &gauge_current,
@@ -115,12 +140,6 @@ BatteryInfo FetchBatteryInfo(void) {
     fprintf(stderr, "batterytool: failed to read IOKit key '%s'\n",
             kGaugeCurrentKey);
   }
-  if (!GetDictBool(properties, kIsChargingKey, &info.is_charging))
-    fprintf(stderr, "batterytool: failed to read IOKit key '%s'\n",
-            kIsChargingKey);
-  if (!GetDictBool(properties, kExternalConnectedKey, &info.is_plugged_in))
-    fprintf(stderr, "batterytool: failed to read IOKit key '%s'\n",
-            kExternalConnectedKey);
 
   CFRelease(properties);
   return info;

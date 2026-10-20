@@ -48,6 +48,8 @@ macOS 27 路径已在 M2 Max（固件 20457.1.29）上实机确认读数与 `CHI
 健康度取系统设置中的"最大容量"（通过 `system_profiler SPPowerDataType -json` 读取；该值由 powerd 自行计算，无法从公开键推出），
 读不到时回退为标称容量 ÷ 设计容量。
 
+- 切断适配器后 IOKit 的 `ExternalConnected` 会变为 No，但适配器功率（`AdapterDetails.Watts`）仍在，
+  因此"适配器已连接"按两者之一判断；只有真正拔掉电源才会结束任务。
 对外名称为 **Battery Tool Plus**，代码中的标识符沿用上游：
 
 | 项目 | 实际名称 |
