@@ -1,6 +1,6 @@
 # Licensing and third-party notices
 
-Battery Tool Plus v0.4.0-beta.1 (2026-10-18) is a modified fork of
+Battery Tool Plus v0.4.0-beta.2 (2026-10-20) is a modified fork of
 [BatteryTool by Orest Tokovenko](https://github.com/oresttokovenko/battery-tool).
 The combined application is distributed under **GPL-3.0-only**; see `LICENSE`.
 This does not replace the original licenses of its components.
