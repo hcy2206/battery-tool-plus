@@ -164,6 +164,7 @@ struct ManagerView: View {
                     LabeledContent("实际充电", value: model.reading.charging ? "正在充电" : "未充电")
                     LabeledContent("CPU / GPU 负载档位", value: String(format: "%.0f%% / %.0f%%", model.cpuLoad, model.gpuLoad))
                     LabeledContent("系统热状态", value: ["正常", "升高 · 降载", "严重 · 暂停", "临界 · 暂停"][min(3, max(0, model.thermal))])
+                    LabeledContent("显示器熄屏", value: model.displayAwake ? "任务期间已阻止" : "由系统管理")
                     if let plan = model.plan {
                         LabeledContent(plan.goal.title, value: plan.deadline.formatted(date: .abbreviated, time: .shortened))
                         if plan.goal == .departure {
@@ -172,6 +173,11 @@ struct ManagerView: View {
                         }
                     }
                 }.frame(maxWidth: .infinity, alignment: .leading).padding(12)
+            }
+            VStack(alignment: .leading, spacing: 4) {
+                Toggle("日常循环与定时压测期间阻止显示器熄屏", isOn: $model.preventDisplaySleep)
+                Text("合盖使用时，放电阶段 macOS 认为没有外接电源，熄屏后无法再点亮外接显示器，直到恢复充电。交还系统管理后自动解除。")
+                    .font(.caption).foregroundStyle(.secondary)
             }
             VStack(alignment: .leading, spacing: 8) {
                 Text("模式").font(.headline)

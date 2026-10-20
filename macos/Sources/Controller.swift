@@ -23,6 +23,12 @@ import IOKit.pwr_mgt
     @Published var reserveMinutes = 120.0
     @Published var reserveReason = "充电样本不足"
     @Published var idleSeconds = 0.0
+    /// With the lid closed, macOS will not light an external display again without external
+    /// power, so a display that sleeps during a discharge stays dark until the adapter is back.
+    @Published var preventDisplaySleep = UserDefaults.standard.object(forKey: "preventDisplaySleep") as? Bool ?? true {
+        didSet { UserDefaults.standard.set(preventDisplaySleep, forKey: "preventDisplaySleep"); tick() }
+    }
+    @Published var displayAwake = false
     let demo: Bool
     private let hardware = HardwareClient()
     private let load = LoadManager()
@@ -42,6 +48,7 @@ import IOKit.pwr_mgt
     private var chargeStall: (Date, Double)?
     private var assertion: IOPMAssertionID = 0
     private var asserting = false
+    private var displayAssertion: IOPMAssertionID = 0
     private var sleeping = false
     private var startGrace = Date.distantPast
     private var thermalHoldUntil = Date.distantPast
@@ -175,10 +182,20 @@ import IOKit.pwr_mgt
             IOPMAssertionRelease(assertion); asserting = false
         }
     }
+    private func setDisplayAssertion(_ active: Bool) {
+        if active && !displayAwake {
+            displayAwake = IOPMAssertionCreateWithName(kIOPMAssertionTypePreventUserIdleDisplaySleep as CFString,
+                                                       IOPMAssertionLevel(kIOPMAssertionLevelOn),
+                                                       "Battery Tool Plus cycling: clamshell display cannot wake without external power" as CFString,
+                                                       &displayAssertion) == kIOReturnSuccess
+        } else if !active && displayAwake {
+            IOPMAssertionRelease(displayAssertion); displayAwake = false
+        }
+    }
     private func sleep() {
         sleeping = true
         load.stop(); cpuLoad = 0; gpuLoad = 0
-        setAssertion(false)
+        setAssertion(false); setDisplayAssertion(false)
         if authorized && !demo {
             do { try hardware.request("charge"); appliedCharging = true }
             catch { errorMessage = "睡眠前恢复失败：\(error.localizedDescription)" }
@@ -239,6 +256,7 @@ import IOKit.pwr_mgt
             if !demo { try load.update(cpu: settings.cpu * scale, gpu: settings.gpu * scale, threads: settings.threads) }
             cpuLoad = settings.cpu * scale; gpuLoad = settings.gpu * scale
             setAssertion(mode == .timed && plan.map { now < $0.deadline } == true && !demo)
+            setDisplayAssertion(preventDisplaySleep && (mode == .daily || mode == .timed) && !demo)
             warning = ""
             if mode == .timed && charging && reading.percent < settings.maximum {
                 if pendingCharge == nil { pendingCharge = (now, reading.percent) }
@@ -264,7 +282,7 @@ import IOKit.pwr_mgt
                 event(reason); lastPlanEvent = reason
             }
         } catch {
-            load.stop(); cpuLoad = 0; gpuLoad = 0; setAssertion(false)
+            load.stop(); cpuLoad = 0; gpuLoad = 0; setAssertion(false); setDisplayAssertion(false)
             mode = .system; plan = nil
             var message = error.localizedDescription
             if authorized && !demo {
@@ -282,7 +300,7 @@ import IOKit.pwr_mgt
     }
     func shutdown() {
         timer?.invalidate(); timer = nil
-        load.stop(); setAssertion(false)
+        load.stop(); setAssertion(false); setDisplayAssertion(false)
         if authorized && !demo {
             do { try hardware.request("quit") }
             catch { event("退出时恢复失败：\(error.localizedDescription)") }
