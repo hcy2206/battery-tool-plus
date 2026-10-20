@@ -3,7 +3,7 @@
 Repository: [hcy2206/battery-tool-plus](https://github.com/hcy2206/battery-tool-plus).
 This project is a fork of [BatteryTool](https://github.com/oresttokovenko/battery-tool).
 
-## Unreleased
+## [0.4.0](https://github.com/hcy2206/battery-tool-plus/releases/tag/v0.4.0) (2026-10-20)
 
 ### Changed
 
@@ -13,6 +13,7 @@ This project is a fork of [BatteryTool](https://github.com/oresttokovenko/batter
 ### Added
 
 - Sidebar option to hide the Dock icon and keep the application in the menu bar only.
+- The bundle build number (`CFBundleVersion`) is the commit count, so it increases across betas and releases.
 
 ## [0.4.0-beta.2](https://github.com/hcy2206/battery-tool-plus/releases/tag/v0.4.0-beta.2) (2026-10-20)
 

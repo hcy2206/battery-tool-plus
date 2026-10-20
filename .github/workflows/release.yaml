@@ -4,7 +4,7 @@ on:
   workflow_dispatch:
     inputs:
       tag:
-        description: Existing version tag (for example v0.4.0-beta.2)
+        description: Existing version tag (for example v0.4.0 or v0.4.1-beta.1)
         required: true
         type: string
 
@@ -34,12 +34,14 @@ jobs:
         run: ./scripts/test-macos.sh
       - name: Package application and corresponding source
         run: ./scripts/package-macos.sh
-      - name: Create draft pre-release
+      - name: Create draft release
         env:
           GH_TOKEN: ${{ github.token }}
           RELEASE_TAG: ${{ inputs.tag }}
         run: |
+          PRERELEASE=()
+          if [[ "$RELEASE_TAG" == *-beta.* ]]; then PRERELEASE=(--prerelease); fi
           gh release create "$RELEASE_TAG" dist/release/* \
-            --verify-tag --draft --prerelease \
+            --verify-tag --draft "${PRERELEASE[@]}" \
             --title "Battery Tool Plus $RELEASE_TAG" \
             --notes-file RELEASE_NOTES.md

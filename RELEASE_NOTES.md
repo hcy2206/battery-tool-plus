@@ -1,30 +1,36 @@
-# Battery Tool Plus v0.4.0-beta.2
+# Battery Tool Plus v0.4.0
 
-修复 macOS 27 固件下电池读数和充电控制失效的问题，并改为以 DMG 分发。基于 BatteryTool 0.3.0。
+首个正式版本。macOS 原生电池管理应用，基于 BatteryTool 0.3.0。
 
-## 修复
+## 功能
 
-- macOS 27 及 15.8 / 26.7 固件：顶层容量键缺失时从嵌套的 `BatteryData` 字典读取，不再显示 -1 % 电量 / 0 % 健康度。
-- 同一固件下的充电控制：SMC 封装不再把不存在的键当作可读；应用和 CLI 按固件实际具有的键集（CHTE、CH0B/CH0C，或仅 CHIE 适配器切断）选择路径，不再在 CHTE 上失败。
-- 历史数据库写入失败只作为警告显示，不再中止任务或撤销电源授权。
-- 负载线程以 user-initiated QoS 运行，落在性能核上；心跳租约延长到 15 s，电源服务偶发卡顿不再导致负载线程退出。
-- 策略拒绝启动任务（例如未插电）时给出原因；推荐时长限制在 24 小时计划范围内，计算推荐不再悄悄保存设置。
-- CLI 在非 root 下直接提示需要 root，而不是在锁文件上报错。
+- SwiftUI 管理窗口与菜单栏入口：实时电量、健康度、循环次数、电源状态和本地电量历史。
+- 四种互斥模式：系统管理、准备外出、日常循环、定时压测；控制台高亮当前模式，菜单栏提供同一组选择。
+- 定时任务区分"到点开始使用电脑"和"到点携带电脑离开"；CPU / Metal GPU 负载覆盖充电和放电全程，使用电脑时自动暂停，跟随系统温控降载。
+- 初始空闲时段、基于本地记录的空闲推荐、无负载充电速度估算。
+- 可选不在程序坞显示，只保留菜单栏图标。
+- 图形应用与 CLI 互斥控制；退出应用时交还系统管理并恢复充电。
 
-## 新增与变更
+## 自 beta.2 以来的变化
 
-- 空闲推荐页重新排版：学习设置分组、小时选择器、开始 / 结束 / 时长窗口卡片。
-- 应用图标、显示名称、分类和版权信息；菜单栏图标反映当前电量和充电状态。
-- 应用改为带 Applications 快捷方式的签名 DMG 分发，不再提供 ZIP。
+- 应用名改为 Battery Tool Plus（`Battery Tool Plus.app`）；可执行文件、bundle 标识符和数据目录不变，已有授权和历史记录保留。
+- 控制台把模式和操作分成两行，高亮跟随当前模式。
+- 新增"不在程序坞显示"开关。
+- 构建号改为提交数，持续递增。
+
+beta.2 修复的 macOS 27 固件电池读数和充电控制问题已包含在内，详见 CHANGELOG。
 
 ## 下载与安装
 
-下载 `BatteryToolPlus-0.4.0-beta.2-macos-arm64.dmg`，双击挂载后把 `BatteryTool.app` 拖到旁边的 Applications 快捷方式上。
+下载 `BatteryToolPlus-0.4.0-macos-arm64.dmg`，双击挂载后把 `Battery Tool Plus.app` 拖到旁边的 Applications 快捷方式上。
 支持 Apple Silicon、macOS 15 及以上，无需 Python。
 
-应用使用 ad-hoc 签名。首次打开时在“系统设置 → 隐私与安全性”点“仍要打开”。
+应用使用 ad-hoc 签名。首次打开时在"系统设置 → 隐私与安全性"点"仍要打开"，
+或执行 `xattr -dr com.apple.quarantine "/Applications/Battery Tool Plus.app"`。
 图形应用以普通用户运行，电池控制在应用内按需请求管理员授权。
 校验方法和重新签名命令见 README。本项目不发布 PyPI 包。
+
+从 beta 版本升级：删除旧的 `BatteryTool.app` 后拖入新应用即可，设置和历史记录位于 `~/Library/Application Support/BatteryTool/`，不受影响。
 
 ## 测试范围
 
@@ -36,6 +42,6 @@
 ## 许可证与源码
 
 组合应用按 GPL-3.0-only 分发，保留上游 Apache-2.0 与 SMC 的原始许可声明。
-`BatteryToolPlus-0.4.0-beta.2-source.tar.gz` 是与二进制同一提交的完整源码；校验值见 `SHA256SUMS`。
+`BatteryToolPlus-0.4.0-source.tar.gz` 是与二进制同一提交的完整源码；校验值见 `SHA256SUMS`。
 
 反馈：https://github.com/hcy2206/battery-tool-plus/issues

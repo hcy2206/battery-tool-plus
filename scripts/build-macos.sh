@@ -4,10 +4,10 @@ cd "$(dirname "$0")/.."
 BUILD="$PWD/build/macos"
 APP="$PWD/dist/Battery Tool Plus.app"
 VERSION=$(awk -F '"' '/^version =/{print $2; exit}' pyproject.toml)
-# Python prerelease versions are mapped to numeric Apple bundle versions.
+# Python prerelease versions are mapped to a numeric Apple short version; the build
+# number is the commit count so it increases across betas and releases alike.
 APP_VERSION=$(printf '%s' "$VERSION" | sed -E 's/b[0-9]+$//')
-BUILD_VERSION=$(printf '%s' "$VERSION" | sed -nE 's/.*b([0-9]+)$/\1/p')
-BUILD_VERSION=${BUILD_VERSION:-1}
+BUILD_VERSION=$(git rev-list --count HEAD 2>/dev/null || echo 1)
 if [[ "$(uname -m)" != "arm64" ]]; then
     echo "Battery Tool Plus requires Apple Silicon (arm64)." >&2
     exit 1
