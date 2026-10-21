@@ -143,12 +143,21 @@ struct ManagerView: View {
             Button("清除历史", role: .destructive) { model.clearHistory() }
         }
     }
-    private func metric(_ title: String, _ value: String, _ icon: String) -> some View {
-        VStack(alignment: .leading, spacing: 12) {
-            Label(title, systemImage: icon).foregroundStyle(.secondary)
-            Text(value).font(.title2.monospacedDigit().bold())
-        }.frame(maxWidth: .infinity, alignment: .leading).padding(18)
-            .background(.quaternary.opacity(0.5), in: RoundedRectangle(cornerRadius: 14))
+    private func metric(_ title: String, _ value: String, _ icon: String, small: Bool = false) -> some View {
+        VStack(alignment: .leading, spacing: small ? 8 : 12) {
+            Label(title, systemImage: icon).font(small ? .caption : .body).foregroundStyle(.secondary)
+            Text(value).font(small ? .title3.monospacedDigit().weight(.semibold) : .title2.monospacedDigit().bold())
+        }.frame(maxWidth: .infinity, alignment: .leading).padding(small ? 14 : 18)
+            .background(.quaternary.opacity(small ? 0.35 : 0.5), in: RoundedRectangle(cornerRadius: 14))
+    }
+    /// Discrete states read as labelled pills; tint marks anything that deserves attention.
+    private func pill(_ title: String, _ value: String, tint: Color) -> some View {
+        HStack(spacing: 6) {
+            Text(title).foregroundStyle(.secondary)
+            Text(value).fontWeight(.medium).foregroundStyle(tint == .secondary ? Color.primary : tint)
+        }
+        .font(.callout).padding(.horizontal, 10).padding(.vertical, 6)
+        .background(tint == .secondary ? Color.primary.opacity(0.06) : tint.opacity(0.12), in: Capsule())
     }
     private var dashboard: some View {
         VStack(alignment: .leading, spacing: 24) {
@@ -157,27 +166,37 @@ struct ManagerView: View {
                 metric("电池健康", String(format: "%.1f%%", model.reading.health), "heart")
                 metric("循环次数", "\(model.reading.cycles)", "arrow.triangle.2.circlepath")
             }
-            GroupBox("运行状态") {
-                VStack(alignment: .leading, spacing: 14) {
-                    LabeledContent("当前模式", value: model.mode.title)
-                    LabeledContent("电源", value: model.reading.plugged ? "适配器已连接" : "电池供电")
-                    LabeledContent("实际充电", value: model.reading.charging ? "正在充电" : "未充电")
-                    LabeledContent("电池功率", value: powerText(model.reading.batteryWatts, signed: true))
-                    LabeledContent("适配器输入 / 系统负载", value: powerText(model.reading.adapterWatts) + " / " + powerText(model.reading.systemWatts))
-                    LabeledContent("CPU / GPU 负载档位", value: String(format: "%.0f%% / %.0f%%", model.cpuLoad, model.gpuLoad))
-                    LabeledContent("系统热状态", value: ["正常", "升高 · 降载", "严重 · 暂停", "临界 · 暂停"][min(3, max(0, model.thermal))])
-                    LabeledContent("显示器熄屏", value: model.displayAwake ? "任务期间已阻止" : "由系统管理")
-                    if model.sleepStorm {
-                        LabeledContent("睡眠通知", value: "风暴中 · 负载不再因通知停止").foregroundStyle(.orange)
-                    }
-                    if let plan = model.plan {
-                        LabeledContent(plan.goal.title, value: plan.deadline.formatted(date: .abbreviated, time: .shortened))
+            HStack {
+                metric("电池功率", powerText(model.reading.batteryWatts, signed: true),
+                       model.reading.batteryWatts < 0 ? "battery.25percent" : "bolt.fill", small: true)
+                metric("适配器输入", powerText(model.reading.adapterWatts), "powerplug", small: true)
+                metric("系统负载", powerText(model.reading.systemWatts), "cpu", small: true)
+            }
+            VStack(alignment: .leading, spacing: 10) {
+                Text("状态").font(.headline)
+                FlowLayout(spacing: 8) {
+                    pill("模式", model.mode.title, tint: model.mode == .system ? .secondary : .accentColor)
+                    pill("电源", model.reading.plugged ? "适配器已连接" : "电池供电",
+                         tint: model.reading.plugged ? .secondary : .orange)
+                    pill("充电", model.reading.charging ? "正在充电" : (model.reading.batteryWatts < 0 ? "放电中" : "未充电"),
+                         tint: model.reading.charging ? .green : .secondary)
+                    pill("负载", model.cpuLoad > 0 || model.gpuLoad > 0
+                         ? String(format: "CPU %.0f%% · GPU %.0f%%", model.cpuLoad, model.gpuLoad) : "未运行",
+                         tint: model.cpuLoad > 0 || model.gpuLoad > 0 ? .accentColor : .secondary)
+                    pill("热状态", ["正常", "升高 · 降载", "严重 · 暂停", "临界 · 暂停"][min(3, max(0, model.thermal))],
+                         tint: model.thermal == 0 ? .secondary : (model.thermal == 1 ? .yellow : .red))
+                    pill("熄屏", model.displayAwake ? "已阻止" : "系统管理", tint: .secondary)
+                    if model.sleepStorm { pill("睡眠通知", "风暴中 · 负载不随通知停止", tint: .orange) }
+                }
+                if let plan = model.plan {
+                    HStack(spacing: 6) {
+                        Image(systemName: "calendar.badge.clock").foregroundStyle(.secondary)
+                        Text("\(plan.goal.title)：\(plan.deadline.formatted(date: .abbreviated, time: .shortened))")
                         if plan.goal == .departure {
-                            LabeledContent("预计提前收尾", value: "\(Int(model.reserveMinutes)) 分钟")
-                            Text(model.reserveReason).font(.caption).foregroundStyle(.secondary)
+                            Text("· 预计提前 \(Int(model.reserveMinutes)) 分钟收尾（\(model.reserveReason)）").foregroundStyle(.secondary)
                         }
-                    }
-                }.frame(maxWidth: .infinity, alignment: .leading).padding(12)
+                    }.font(.callout).padding(.top, 2)
+                }
             }
             VStack(alignment: .leading, spacing: 4) {
                 Toggle("日常循环与定时压测期间阻止显示器熄屏", isOn: $model.preventDisplaySleep)
@@ -436,3 +455,27 @@ struct ManagerView: View {
 }
 
 #endif
+
+
+/// Wrapping horizontal layout for the status pills.
+struct FlowLayout: Layout {
+    var spacing: CGFloat = 8
+    func sizeThatFits(proposal: ProposedViewSize, subviews: Subviews, cache: inout ()) -> CGSize {
+        rows(proposal.width ?? .infinity, subviews).size
+    }
+    func placeSubviews(in bounds: CGRect, proposal: ProposedViewSize, subviews: Subviews, cache: inout ()) {
+        for (index, origin) in rows(bounds.width, subviews).origins.enumerated() {
+            subviews[index].place(at: CGPoint(x: bounds.minX + origin.x, y: bounds.minY + origin.y), proposal: .unspecified)
+        }
+    }
+    private func rows(_ width: CGFloat, _ subviews: Subviews) -> (size: CGSize, origins: [CGPoint]) {
+        var origins = [CGPoint](); var x: CGFloat = 0, y: CGFloat = 0, rowHeight: CGFloat = 0, maxX: CGFloat = 0
+        for view in subviews {
+            let size = view.sizeThatFits(.unspecified)
+            if x > 0 && x + size.width > width { x = 0; y += rowHeight + spacing; rowHeight = 0 }
+            origins.append(CGPoint(x: x, y: y))
+            x += size.width + spacing; rowHeight = max(rowHeight, size.height); maxX = max(maxX, x - spacing)
+        }
+        return (CGSize(width: maxX, height: y + rowHeight), origins)
+    }
+}

@@ -9,6 +9,10 @@ This project is a fork of [BatteryTool](https://github.com/oresttokovenko/batter
 
 - Dashboard shows live power: battery charge/discharge watts (IOKit `Voltage` × `InstantAmperage`, matching the firmware's own `BatteryPower`), adapter input and system load (SMC `PowerTelemetryData`).
 
+### Changed
+
+- Dashboard run state is split by kind: large cards for the battery metrics, smaller cards for the three power figures, and a wrapping row of labelled pills for discrete states (mode, power source, charging, load, thermal, display sleep, sleep storm) with colour only where attention is due; the plan deadline sits on its own line.
+
 ## [0.4.2](https://github.com/hcy2206/battery-tool-plus/releases/tag/v0.4.2) (2026-10-21)
 
 ### Fixed
