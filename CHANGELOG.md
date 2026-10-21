@@ -3,7 +3,7 @@
 Repository: [hcy2206/battery-tool-plus](https://github.com/hcy2206/battery-tool-plus).
 This project is a fork of [BatteryTool](https://github.com/oresttokovenko/battery-tool).
 
-## Unreleased
+## [0.4.3](https://github.com/hcy2206/battery-tool-plus/releases/tag/v0.4.3) (2026-10-21)
 
 ### Added
 
