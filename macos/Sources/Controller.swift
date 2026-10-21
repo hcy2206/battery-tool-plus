@@ -50,6 +50,9 @@ import IOKit.pwr_mgt
     private var asserting = false
     private var displayAssertion: IOPMAssertionID = 0
     private var sleeping = false
+    private var pendingSleepRestore: DispatchWorkItem?
+    private var lastSleepEvent = Date.distantPast
+    private var sleepEventsSuppressed = 0
     private var startGrace = Date.distantPast
     private var thermalHoldUntil = Date.distantPast
     private var controllerLock: Int32 = -1
@@ -78,12 +81,7 @@ import IOKit.pwr_mgt
             MainActor.assumeIsolated { self?.sleep() }
         })
         observers.append(center.addObserver(forName: NSWorkspace.didWakeNotification, object: nil, queue: .main) { [weak self] _ in
-            MainActor.assumeIsolated {
-                self?.sleeping = false
-                self?.startGrace = Date().addingTimeInterval(30)
-                self?.appliedCharging = nil
-                self?.tick()
-            }
+            MainActor.assumeIsolated { self?.wake() }
         })
         tick()
         refreshHistory()
@@ -192,18 +190,46 @@ import IOKit.pwr_mgt
             IOPMAssertionRelease(displayAssertion); displayAwake = false
         }
     }
+    /// A sleep notice is not always a sleep: another process tickling the display every few
+    /// seconds in clamshell mode produces a willSleep/didWake pair each time. Charging is restored
+    /// only if the Mac has not woken again within a short grace, and the helper keeps being
+    /// pinged while asleep so a dark-wake maintenance window cannot expire its lease.
+    static let sleepRestoreGrace: TimeInterval = 3
     private func sleep() {
         sleeping = true
         load.stop(); cpuLoad = 0; gpuLoad = 0
         setAssertion(false); setDisplayAssertion(false)
-        if authorized && !demo {
-            do { try hardware.request("charge"); appliedCharging = true }
-            catch { errorMessage = "睡眠前恢复失败：\(error.localizedDescription)" }
+        pendingSleepRestore?.cancel()
+        let restore = DispatchWorkItem { [weak self] in
+            MainActor.assumeIsolated {
+                guard let self, self.sleeping, self.authorized, !self.demo else { return }
+                do { try self.hardware.request("charge"); self.appliedCharging = true }
+                catch { self.errorMessage = "睡眠前恢复失败：\(error.localizedDescription)" }
+            }
         }
-        event("系统睡眠：停止负载，唤醒后重新检查任务截止时间")
+        pendingSleepRestore = restore
+        DispatchQueue.main.asyncAfter(deadline: .now() + Controller.sleepRestoreGrace, execute: restore)
+        let now = Date()
+        if now.timeIntervalSince(lastSleepEvent) >= 60 {
+            let suffix = sleepEventsSuppressed > 0 ? "（期间另有 \(sleepEventsSuppressed) 次睡眠通知）" : ""
+            event("系统睡眠：停止负载，唤醒后重新检查任务截止时间" + suffix)
+            lastSleepEvent = now; sleepEventsSuppressed = 0
+        } else { sleepEventsSuppressed += 1 }
+    }
+    private func wake() {
+        pendingSleepRestore?.cancel(); pendingSleepRestore = nil
+        sleeping = false
+        startGrace = Date().addingTimeInterval(30)
+        appliedCharging = nil
+        tick()
     }
     func tick() {
-        guard !sleeping, controllerLock >= 0 else { return }
+        guard controllerLock >= 0 else { return }
+        if sleeping {
+            // Heartbeat only: the lease must survive dark wakes, and nothing else may change.
+            if authorized && !demo { try? hardware.request("ping") }
+            return
+        }
         let now = Date()
         let observationGap = now.timeIntervalSince(lastTick)
         lastTick = now

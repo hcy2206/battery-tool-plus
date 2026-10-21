@@ -3,6 +3,13 @@
 Repository: [hcy2206/battery-tool-plus](https://github.com/hcy2206/battery-tool-plus).
 This project is a fork of [BatteryTool](https://github.com/oresttokovenko/battery-tool).
 
+## Unreleased
+
+### Fixed
+
+- A sleep notice that is not followed by sleep (another process tickling the display every few seconds in clamshell mode produced ~2000 willSleep/didWake pairs in one night) no longer restores charging and logs an event each time: charging is restored only if the Mac has not woken within 3 s, and repeated notices within a minute collapse into one history event with a count.
+- The power service kept counting its lease during dark-wake maintenance windows while the app stayed silent, so a long sleep ended the task with "power service not connected". The app now keeps pinging the service while the system reports sleep.
+
 ## [0.4.1](https://github.com/hcy2206/battery-tool-plus/releases/tag/v0.4.1) (2026-10-20)
 
 ### Fixed

@@ -89,6 +89,17 @@ import AppKit
         let duplicate = Controller(demo: true, storageDirectory: directory, startTimer: false)
         precondition(!duplicate.start(plan: Plan(start: now, deadline: now.addingTimeInterval(3600), goal: .desk)))
         duplicate.shutdown()
+        // Sleep notices within a minute collapse into one event; wake re-enters the task.
+        precondition(model.start(plan: Plan(start: now, deadline: now.addingTimeInterval(3600), goal: .desk)))
+        let center = NSWorkspace.shared.notificationCenter
+        for _ in 0..<3 {
+            center.post(name: NSWorkspace.willSleepNotification, object: nil)
+            precondition(model.cpuLoad == 0, "sleep must stop load")
+            center.post(name: NSWorkspace.didWakeNotification, object: nil)
+        }
+        precondition(model.events.filter { $0.contains("系统睡眠") }.count == 1, "sleep events must be deduplicated")
+        precondition(model.mode == .timed, "wake must keep the task")
+        model.switchMode(.system)
         model.settings.recordHistory = true
         model.tick()
         model.refreshHistory()
