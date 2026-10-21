@@ -8,6 +8,9 @@ class BatteryInfo(Protocol):
     design_capacity: int
     cycle_count: int
     state_of_charge: int
+    battery_power_mw: int
+    adapter_power_mw: int
+    system_power_mw: int
     is_charging: bool
     is_plugged_in: bool
 

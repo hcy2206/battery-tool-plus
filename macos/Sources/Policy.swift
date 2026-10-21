@@ -52,6 +52,10 @@ struct Reading {
     var plugged: Bool
     var charging: Bool
     var cycles: Int
+    /// Watts; battery is signed (charging positive, discharging negative). 0 = unavailable.
+    var batteryWatts = 0.0
+    var adapterWatts = 0.0
+    var systemWatts = 0.0
     var valid: Bool { percent.isFinite && health.isFinite && percent >= 0 && health > 0 }
 }
 struct Decision {

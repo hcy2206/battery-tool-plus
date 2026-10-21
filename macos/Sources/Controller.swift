@@ -275,7 +275,8 @@ import IOKit.pwr_mgt
         thermal = demo ? 0 : ProcessInfo.processInfo.thermalState.rawValue
         if thermal >= 2 { thermalHoldUntil = now.addingTimeInterval(60) }
         if !demo { systemHealth.refreshIfStale() }
-        reading = demo ? Reading(percent: 64, health: 91, plugged: true, charging: charging, cycles: 182)
+        reading = demo ? Reading(percent: 64, health: 91, plugged: true, charging: charging, cycles: 182,
+                                   batteryWatts: charging ? 38.2 : -41.5, adapterWatts: charging ? 72.4 : 0, systemWatts: 34.1)
             : batteryReading(systemHealth: systemHealth.value)
         do {
             let settings = runtimeSettings

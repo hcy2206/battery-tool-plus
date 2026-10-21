@@ -3,6 +3,12 @@
 Repository: [hcy2206/battery-tool-plus](https://github.com/hcy2206/battery-tool-plus).
 This project is a fork of [BatteryTool](https://github.com/oresttokovenko/battery-tool).
 
+## Unreleased
+
+### Added
+
+- Dashboard shows live power: battery charge/discharge watts (IOKit `Voltage` × `InstantAmperage`, matching the firmware's own `BatteryPower`), adapter input and system load (SMC `PowerTelemetryData`).
+
 ## [0.4.2](https://github.com/hcy2206/battery-tool-plus/releases/tag/v0.4.2) (2026-10-21)
 
 ### Fixed

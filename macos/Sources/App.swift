@@ -162,6 +162,8 @@ struct ManagerView: View {
                     LabeledContent("当前模式", value: model.mode.title)
                     LabeledContent("电源", value: model.reading.plugged ? "适配器已连接" : "电池供电")
                     LabeledContent("实际充电", value: model.reading.charging ? "正在充电" : "未充电")
+                    LabeledContent("电池功率", value: powerText(model.reading.batteryWatts, signed: true))
+                    LabeledContent("适配器输入 / 系统负载", value: powerText(model.reading.adapterWatts) + " / " + powerText(model.reading.systemWatts))
                     LabeledContent("CPU / GPU 负载档位", value: String(format: "%.0f%% / %.0f%%", model.cpuLoad, model.gpuLoad))
                     LabeledContent("系统热状态", value: ["正常", "升高 · 降载", "严重 · 暂停", "临界 · 暂停"][min(3, max(0, model.thermal))])
                     LabeledContent("显示器熄屏", value: model.displayAwake ? "任务期间已阻止" : "由系统管理")
@@ -293,6 +295,12 @@ struct ManagerView: View {
                     .buttonStyle(.borderedProminent)
             }
         }
+    }
+    /// Battery power is signed: charging positive, discharging negative; zero means idle or unavailable.
+    private func powerText(_ watts: Double, signed: Bool = false) -> String {
+        guard watts != 0 else { return signed ? "0 W" : "— W" }
+        let label = signed ? (watts > 0 ? "充电 " : "放电 ") : ""
+        return label + String(format: "%.1f W", abs(watts))
     }
     private func number(_ title: String, _ value: Binding<Double>) -> some View {
         TextField(title, value: value, format: .number).textFieldStyle(.roundedBorder)

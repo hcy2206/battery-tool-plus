@@ -2,6 +2,7 @@
 
 #include <CoreFoundation/CoreFoundation.h>
 #include <IOKit/IOKitLib.h>
+#include <limits.h>
 #include <stdio.h>
 
 static const char kAppleSmartBattery[] = "AppleSmartBattery";
@@ -25,6 +26,25 @@ static const char kGaugeMaxKey[] = "MaxCapacity";
 // published, so that is what tells a forced discharge from a real unplug.
 static const char kAdapterDetailsKey[] = "AdapterDetails";
 static const char kAdapterWattsKey[] = "Watts";
+
+// Instantaneous power: battery = Voltage (mV) x InstantAmperage (mA, signed);
+// adapter input and system load come from the SMC's power telemetry (mW).
+static const char kVoltageKey[] = "Voltage";
+static const char kInstantAmperageKey[] = "InstantAmperage";
+static const char kPowerTelemetryKey[] = "PowerTelemetryData";
+static const char kSystemPowerInKey[] = "SystemPowerIn";
+static const char kSystemLoadKey[] = "SystemLoad";
+
+static CFDictionaryRef GetDict(CFDictionaryRef dict, const char* key) {
+  CFStringRef cf_key =
+      CFStringCreateWithCString(NULL, key, kCFStringEncodingUTF8);
+  CFDictionaryRef nested = CFDictionaryGetValue(dict, cf_key);
+  CFRelease(cf_key);
+  if (nested == NULL || CFGetTypeID(nested) != CFDictionaryGetTypeID()) {
+    return NULL;
+  }
+  return nested;
+}
 
 // Newer firmware (macOS 27 and the 15.8 / 26.7 firmware updates) moves the
 // capacity figures into this nested dictionary and renames the raw current
@@ -126,6 +146,26 @@ BatteryInfo FetchBatteryInfo(void) {
         GetDictInt(adapter, kAdapterWattsKey, &watts, kCFNumberIntType) &&
         watts > 0) {
       info.is_plugged_in = true;
+    }
+  }
+
+  long long voltage = 0, amperage = 0;
+  if (GetDictInt(properties, kVoltageKey, &voltage, kCFNumberSInt64Type) &&
+      GetDictInt(properties, kInstantAmperageKey, &amperage,
+                 kCFNumberSInt64Type) &&
+      voltage > 0) {
+    info.battery_power_mw = (int)(voltage * amperage / 1000);
+  }
+  CFDictionaryRef telemetry = GetDict(properties, kPowerTelemetryKey);
+  if (telemetry != NULL) {
+    long long value = 0;
+    if (GetDictInt(telemetry, kSystemPowerInKey, &value, kCFNumberSInt64Type) &&
+        value >= 0 && value < INT_MAX) {
+      info.adapter_power_mw = (int)value;
+    }
+    if (GetDictInt(telemetry, kSystemLoadKey, &value, kCFNumberSInt64Type) &&
+        value >= 0 && value < INT_MAX) {
+      info.system_power_mw = (int)value;
     }
   }
 

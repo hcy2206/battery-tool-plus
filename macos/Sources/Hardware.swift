@@ -14,7 +14,9 @@ func batteryReading(systemHealth: Double? = nil) -> Reading {
         : Double(info.current_capacity) / Double(info.max_capacity) * 100
     return Reading(percent: gauge,
                    health: systemHealth ?? Double(info.max_capacity) / Double(info.design_capacity) * 100,
-                   plugged: info.is_plugged_in, charging: info.is_charging, cycles: Int(info.cycle_count))
+                   plugged: info.is_plugged_in, charging: info.is_charging, cycles: Int(info.cycle_count),
+                   batteryWatts: Double(info.battery_power_mw) / 1000, adapterWatts: Double(info.adapter_power_mw) / 1000,
+                   systemWatts: Double(info.system_power_mw) / 1000)
 }
 
 /// powerd's filtered "Maximum Capacity" is only handed to callers with a private entitlement;
