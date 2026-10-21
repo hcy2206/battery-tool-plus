@@ -29,6 +29,14 @@ import IOKit.pwr_mgt
         didSet { UserDefaults.standard.set(preventDisplaySleep, forKey: "preventDisplaySleep"); tick() }
     }
     @Published var displayAwake = false
+    /// PushDeer key; empty disables pushes. Stored outside Settings so older settings files load.
+    @Published var pushKey = UserDefaults.standard.string(forKey: "pushDeerKey") ?? "" {
+        didSet { UserDefaults.standard.set(pushKey, forKey: "pushDeerKey"); notifier.key = pushKey }
+    }
+    @Published var pushStatus = ""
+    /// Repeated sleep notices that the system then abandons (another process waking the display
+    /// every few seconds in clamshell mode). Load is kept running through them.
+    @Published var sleepStorm = false
     let demo: Bool
     private let hardware = HardwareClient()
     private let load = LoadManager()
@@ -51,6 +59,8 @@ import IOKit.pwr_mgt
     private var displayAssertion: IOPMAssertionID = 0
     private var sleeping = false
     private var pendingSleepRestore: DispatchWorkItem?
+    private var recentSleepNotices = [Date]()
+    let notifier: Notifier
     private var lastSleepEvent = Date.distantPast
     private var sleepEventsSuppressed = 0
     private var startGrace = Date.distantPast
@@ -58,8 +68,9 @@ import IOKit.pwr_mgt
     private var controllerLock: Int32 = -1
     private let settingsURL: URL
 
-    init(demo: Bool, storageDirectory: URL? = nil, startTimer: Bool = true) {
+    init(demo: Bool, storageDirectory: URL? = nil, startTimer: Bool = true, transport: Notifier.Transport? = nil) {
         self.demo = demo
+        notifier = Notifier(key: UserDefaults.standard.string(forKey: "pushDeerKey") ?? "", transport: transport)
         let base = storageDirectory ?? FileManager.default.urls(for: .applicationSupportDirectory, in: .userDomainMask)[0]
             .appendingPathComponent(demo ? "BatteryTool-Demo" : "BatteryTool")
         settingsURL = base.appendingPathComponent("settings.json")
@@ -195,21 +206,37 @@ import IOKit.pwr_mgt
     /// only if the Mac has not woken again within a short grace, and the helper keeps being
     /// pinged while asleep so a dark-wake maintenance window cannot expire its lease.
     static let sleepRestoreGrace: TimeInterval = 3
+    static let sleepStormThreshold = 4
     private func sleep() {
         sleeping = true
-        load.stop(); cpuLoad = 0; gpuLoad = 0
+        let now = Date()
+        recentSleepNotices = recentSleepNotices.filter { now.timeIntervalSince($0) < 60 } + [now]
+        if !sleepStorm && recentSleepNotices.count >= Controller.sleepStormThreshold {
+            sleepStorm = true
+            let text = "一分钟内收到 \(recentSleepNotices.count) 次系统睡眠通知且随即唤醒。可能有程序在频繁点亮显示器；负载将不再因这些通知停止。排查：pmset -g log | grep UserIsActive"
+            event("检测到睡眠通知风暴：" + text)
+            notify("睡眠通知风暴", text)
+        }
+        // In a storm the Mac does not actually sleep; stopping load on every notice would starve
+        // the session, so load is stopped together with the deferred charge restore instead.
+        // Workers exit on their own 15 s heartbeat lease if the Mac does sleep after all.
+        if !sleepStorm { load.stop(); cpuLoad = 0; gpuLoad = 0 }
         setAssertion(false); setDisplayAssertion(false)
         pendingSleepRestore?.cancel()
         let restore = DispatchWorkItem { [weak self] in
             MainActor.assumeIsolated {
-                guard let self, self.sleeping, self.authorized, !self.demo else { return }
+                guard let self, self.sleeping else { return }
+                self.load.stop(); self.cpuLoad = 0; self.gpuLoad = 0
+                guard self.authorized, !self.demo else { return }
                 do { try self.hardware.request("charge"); self.appliedCharging = true }
-                catch { self.errorMessage = "睡眠前恢复失败：\(error.localizedDescription)" }
+                catch {
+                    self.errorMessage = "睡眠前恢复失败：\(error.localizedDescription)"
+                    self.notify("睡眠前恢复充电失败", error.localizedDescription)
+                }
             }
         }
         pendingSleepRestore = restore
         DispatchQueue.main.asyncAfter(deadline: .now() + Controller.sleepRestoreGrace, execute: restore)
-        let now = Date()
         if now.timeIntervalSince(lastSleepEvent) >= 60 {
             let suffix = sleepEventsSuppressed > 0 ? "（期间另有 \(sleepEventsSuppressed) 次睡眠通知）" : ""
             event("系统睡眠：停止负载，唤醒后重新检查任务截止时间" + suffix)
@@ -237,6 +264,10 @@ import IOKit.pwr_mgt
             // Never infer user idleness across a sleep, clock jump, or controller stall.
             startGrace = now.addingTimeInterval(settings.idleSeconds)
             load.stop()
+        }
+        if sleepStorm, let last = recentSleepNotices.last, now.timeIntervalSince(last) > 300 {
+            sleepStorm = false; recentSleepNotices.removeAll()
+            event("睡眠通知风暴已结束")
         }
         // kCGAnyInputEventType is the documented all-input sentinel.
         idleSeconds = CGEventSource.secondsSinceLastEventType(.combinedSessionState, eventType: CGEventType(rawValue: ~UInt32(0))!)
@@ -266,6 +297,13 @@ import IOKit.pwr_mgt
                                          reserve: reserve.0, paused: paused, stalled: stalled)
             if decision.mode != mode {
                 event("任务转换：\(decision.reason)")
+                // The departure reserve phase is part of the plan; everything else ending a task is not.
+                let healthReached = reading.health <= settings.targetHealth
+                if (mode == .daily || mode == .timed) && (decision.mode == .system || healthReached
+                    || reading.percent <= max(3, settings.minimum / 2)) {
+                    notify(healthReached ? "已达到目标健康度" : "任务结束",
+                           "\(decision.reason)。电量 \(Int(reading.percent.rounded()))%，健康度 \(String(format: "%.1f", reading.health))%。")
+                }
                 mode = decision.mode
                 if mode != .timed { plan = nil }
             }
@@ -322,7 +360,22 @@ import IOKit.pwr_mgt
             authorized = demo
             reason = "任务已停止"
             if errorMessage != message { event(message); errorMessage = message }
+            notify("任务因错误停止", message)
         }
+    }
+    /// Pushed: task endings the user did not trigger, failed charging restoration, sleep storms.
+    /// Not pushed: phase flips, thermal pauses, user activity pauses, user-initiated mode changes.
+    func notify(_ title: String, _ body: String) {
+        guard !demo || notifier.key.hasPrefix("test-") else { return }
+        notifier.send(title, body) { [weak self] error in
+            if let error { self?.pushStatus = "推送失败：\(error.localizedDescription)" }
+        }
+    }
+    func testPush() {
+        pushStatus = "发送中…"
+        guard notifier.send("测试推送", "来自 \(Host.current().localizedName ?? "Mac") 的测试消息。", force: true, completion: { [weak self] error in
+            self?.pushStatus = error.map { "推送失败：\($0.localizedDescription)" } ?? "已发送 \(Date().formatted(date: .omitted, time: .shortened))"
+        }) else { pushStatus = "请先填写 PushDeer Key"; return }
     }
     func shutdown() {
         timer?.invalidate(); timer = nil

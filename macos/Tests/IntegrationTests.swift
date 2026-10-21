@@ -64,7 +64,10 @@ import AppKit
         NSApp.setActivationPolicy(.prohibited)
         let directory = FileManager.default.temporaryDirectory.appendingPathComponent(UUID().uuidString)
         defer { try? FileManager.default.removeItem(at: directory) }
-        let model = Controller(demo: true, storageDirectory: directory, startTimer: false)
+        UserDefaults.standard.removeObject(forKey: "pushDeerKey")
+        var pushed = [String]()
+        let model = Controller(demo: true, storageDirectory: directory, startTimer: false,
+                               transport: { request, done in pushed.append(request.url!.query ?? ""); done(nil) })
         defer { model.shutdown() }
         precondition(model.errorMessage == nil, model.errorMessage ?? "")
         model.switchMode(.daily)
@@ -92,13 +95,17 @@ import AppKit
         // Sleep notices within a minute collapse into one event; wake re-enters the task.
         precondition(model.start(plan: Plan(start: now, deadline: now.addingTimeInterval(3600), goal: .desk)))
         let center = NSWorkspace.shared.notificationCenter
-        for _ in 0..<3 {
+        model.pushKey = "test-key"
+        for index in 0..<Controller.sleepStormThreshold {
             center.post(name: NSWorkspace.willSleepNotification, object: nil)
-            precondition(model.cpuLoad == 0, "sleep must stop load")
+            if index < Controller.sleepStormThreshold - 1 { precondition(model.cpuLoad == 0, "sleep must stop load") }
+            else { precondition(model.cpuLoad == 50 && model.sleepStorm, "a storm must keep load running") }
             center.post(name: NSWorkspace.didWakeNotification, object: nil)
         }
-        precondition(model.events.filter { $0.contains("系统睡眠") }.count == 1, "sleep events must be deduplicated")
+        precondition(model.events.filter { $0.contains("系统睡眠：") }.count == 1, "sleep events must be deduplicated")
         precondition(model.mode == .timed, "wake must keep the task")
+        precondition(pushed.count == 1 && pushed[0].contains("pushkey=test-key"), "a storm pushes once: \(pushed)")
+        model.pushKey = ""
         model.switchMode(.system)
         model.settings.recordHistory = true
         model.tick()

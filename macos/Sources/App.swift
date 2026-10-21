@@ -165,6 +165,9 @@ struct ManagerView: View {
                     LabeledContent("CPU / GPU 负载档位", value: String(format: "%.0f%% / %.0f%%", model.cpuLoad, model.gpuLoad))
                     LabeledContent("系统热状态", value: ["正常", "升高 · 降载", "严重 · 暂停", "临界 · 暂停"][min(3, max(0, model.thermal))])
                     LabeledContent("显示器熄屏", value: model.displayAwake ? "任务期间已阻止" : "由系统管理")
+                    if model.sleepStorm {
+                        LabeledContent("睡眠通知", value: "风暴中 · 负载不再因通知停止").foregroundStyle(.orange)
+                    }
                     if let plan = model.plan {
                         LabeledContent(plan.goal.title, value: plan.deadline.formatted(date: .abbreviated, time: .shortened))
                         if plan.goal == .departure {
@@ -258,6 +261,17 @@ struct ManagerView: View {
                     number("目标健康度 (%)", $model.settings.targetHealth)
                     Toggle("使用电脑时自动暂停负载", isOn: $model.settings.pauseOnActivity)
                     number("持续空闲后恢复 (秒)", $model.settings.idleSeconds)
+                }.frame(maxWidth: .infinity, alignment: .leading).padding(12)
+            }
+            GroupBox("推送通知（PushDeer）") {
+                VStack(alignment: .leading, spacing: 8) {
+                    HStack {
+                        TextField("PushDeer Key", text: $model.pushKey).textFieldStyle(.roundedBorder)
+                        Button("发送测试") { model.testPush() }.disabled(model.pushKey.isEmpty)
+                    }
+                    Text("只推送需要你介入的情况：任务意外结束（拔电、读数异常、低电量保护、电源写入失败、电源服务失联）、恢复充电失败、睡眠通知风暴、达到目标健康度。充放电切换、温控暂停、使用电脑暂停不推送；相同内容 30 分钟内不重复。")
+                        .font(.caption).foregroundStyle(.secondary)
+                    if !model.pushStatus.isEmpty { Text(model.pushStatus).font(.caption) }
                 }.frame(maxWidth: .infinity, alignment: .leading).padding(12)
             }
             if let suggestion = model.recommendation {
