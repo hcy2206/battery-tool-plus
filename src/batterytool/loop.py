@@ -41,12 +41,15 @@ class SleepHold:
         run: Callable[..., object] | None = None,
         enabled: bool | None = None,
         settle: Callable[[], None] | None = None,
+        user_disabled: bool | None = None,
     ):
         self._run = run or subprocess.run
         self._enabled = (not os.environ.get("BATTERYTOOL_FAKE")) if enabled is None else enabled
         self._settle = settle or self._wait_for_adapter
         self._held = False
-        self._user_disabled = self._enabled and self._registry_flag("IOPMrootDomain", "SleepDisabled")
+        if user_disabled is None:
+            user_disabled = self._enabled and self._registry_flag("IOPMrootDomain", "SleepDisabled")
+        self._user_disabled = user_disabled
 
     @staticmethod
     def _registry_flag(service: str, key: str) -> bool:

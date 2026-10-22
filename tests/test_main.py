@@ -188,7 +188,8 @@ def test_sleep_is_disabled_only_while_discharging(hw):
     calls = []
 
     _cycle_loop(79, 95, 5, 0, setup_logging(), legacy_enable_charging, legacy_disable_charging,
-                sleep_hold=SleepHold(run=lambda args, **_: calls.append(args[-1]), enabled=True, settle=lambda: None))
+                sleep_hold=SleepHold(run=lambda args, **_: calls.append(args[-1]), enabled=True, settle=lambda: None,
+                                     user_disabled=False))
 
     assert calls == ["1", "0"]
     assert hw.writes() == LEGACY_DISABLE + LEGACY_ENABLE
