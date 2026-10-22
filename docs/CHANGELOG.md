@@ -3,6 +3,16 @@
 Repository: [hcy2206/battery-tool-plus](https://github.com/hcy2206/battery-tool-plus).
 This project is a fork of [BatteryTool](https://github.com/oresttokovenko/battery-tool).
 
+## [1.0.0](https://github.com/hcy2206/battery-tool-plus/releases/tag/v1.0.0) (2026-10-22)
+
+First stable release. The application behaves as in 0.4.3; this release settles the documentation and repository layout.
+
+### Changed
+
+- README is a product overview with a dashboard screenshot; the operational detail moved to `docs/USER_GUIDE.md`.
+- All documentation now lives under `docs/`: `USER_GUIDE.md` (installation, modes, load and thermal rules, sleep handling, firmware support, CLI), `CONTRIBUTING.md` (development guide, in Chinese), `RELEASING.md`, `CHANGELOG.md`, `RELEASE_NOTES.md` and `THIRD_PARTY_NOTICES.md`. `macos/README.md` is folded into the user guide. `LICENSE` and `LICENSES/` stay at the repository root.
+- CI calls ruff, basedpyright, pytest and meson directly; the nox session file and the Brewfile are removed.
+
 ## [0.4.3](https://github.com/hcy2206/battery-tool-plus/releases/tag/v0.4.3) (2026-10-21)
 
 ### Added

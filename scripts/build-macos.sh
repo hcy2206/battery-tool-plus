@@ -39,7 +39,7 @@ cat > "$APP/Contents/Info.plist" <<PLIST
 <key>NSHighResolutionCapable</key><true/>
 </dict></plist>
 PLIST
-cp LICENSE THIRD_PARTY_NOTICES.md macos/AppIcon.icns "$APP/Contents/Resources/"
+cp LICENSE docs/THIRD_PARTY_NOTICES.md macos/AppIcon.icns "$APP/Contents/Resources/"
 mkdir -p "$APP/Contents/Resources/LICENSES"
 cp LICENSES/*.txt "$APP/Contents/Resources/LICENSES/"
 codesign --force --deep --sign - "$APP"

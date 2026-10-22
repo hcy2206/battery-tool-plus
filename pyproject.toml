@@ -4,7 +4,7 @@ requires = [ "cffi>=2", "meson-python" ]
 
 [project]
 name = "battery-tool"
-version = "0.4.3"
+version = "1.0.0"
 description = "Battery Tool Plus: battery cycling and compute-load manager for Apple Silicon MacBooks"
 readme = "README.md"
 license = { text = "GPL-3.0-only" }
@@ -22,7 +22,7 @@ dependencies = [
   "structlog>=25.5",
   "typer>=0.23",
 ]
-urls.Changelog = "https://github.com/hcy2206/battery-tool-plus/blob/main/CHANGELOG.md"
+urls.Changelog = "https://github.com/hcy2206/battery-tool-plus/blob/main/docs/CHANGELOG.md"
 urls.Homepage = "https://github.com/hcy2206/battery-tool-plus"
 urls.Issues = "https://github.com/hcy2206/battery-tool-plus/issues"
 urls.Releases = "https://github.com/hcy2206/battery-tool-plus/releases"
@@ -36,7 +36,6 @@ dev = [
   "meson>=1.2",
   "meson-python",
   "ninja",
-  "nox>=2026.2.9",
   "pyproject-fmt>=2.16",
   "pytest>=8.3.4",
   "pytest-mock>=3.14",
@@ -49,7 +48,7 @@ no-build-isolation-package = [ "battery-tool" ]
 [tool.ruff]
 target-version = "py312"
 line-length = 120
-exclude = [ "noxfile.py", "tests/**" ]
+exclude = [ "tests/**" ]
 format.quote-style = "double"
 lint.select = [
   # finds likely bugs and design problems

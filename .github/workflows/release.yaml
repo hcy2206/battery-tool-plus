@@ -44,4 +44,4 @@ jobs:
           gh release create "$RELEASE_TAG" dist/release/* \
             --verify-tag --draft "${PRERELEASE[@]}" \
             --title "Battery Tool Plus $RELEASE_TAG" \
-            --notes-file RELEASE_NOTES.md
+            --notes-file docs/RELEASE_NOTES.md

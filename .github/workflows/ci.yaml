@@ -43,16 +43,16 @@ jobs:
           uv sync --all-groups
 
       - name: Run lint
-        run: uv run nox -s lint
+        run: uv run ruff check src/batterytool
 
       - name: Run format check
-        run: uv run nox -s format_check
+        run: uv run ruff format --check src/batterytool
 
       - name: Run type check
-        run: uv run nox -s type_check
+        run: uv run basedpyright
 
       - name: Run Python tests
-        run: uv run nox -s tests
+        run: uv run pytest
 
       # latest prebuilt LLVM available for darwin/arm64; warnings only, never fails the job
       - name: Install LLVM and Clang
@@ -66,7 +66,10 @@ jobs:
         run: clang-tidy --extra-arg=-isysroot --extra-arg="$(xcrun --show-sdk-path)" c/power_sources.c c/power_sources_fake.c c/smc_fake.c c/smc_wrapper.c c/power_sources.h c/smc_wrapper.h
 
       - name: Run C tests
-        run: uv run nox -s c_test
+        run: |
+          uv run meson setup builddir --native-file native-macos.ini
+          uv run meson compile -C builddir
+          uv run meson test -C builddir --no-suite hardware
 
       # /usr/bin explicitly: install-llvm-action puts its clang first on PATH,
       # and meson.build requires Apple Clang

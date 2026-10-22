@@ -1,15 +1,15 @@
 # Licensing and third-party notices
 
-Battery Tool Plus v0.4.0 (2026-10-20) is a modified fork of
+Battery Tool Plus 1.0.0 (2026-10-22) is a modified fork of
 [BatteryTool by Orest Tokovenko](https://github.com/oresttokovenko/battery-tool).
-The combined application is distributed under **GPL-3.0-only**; see `LICENSE`.
+The combined application is distributed under **GPL-3.0-only**; see `../LICENSE`.
 This does not replace the original licenses of its components.
 
 ## Upstream BatteryTool
 
 The upstream Python/C project was distributed under Apache License 2.0, except
 for separately licensed third-party files. Its license is preserved verbatim in
-`LICENSES/Apache-2.0.txt`. Attribution and historical changelog entries remain.
+`../LICENSES/Apache-2.0.txt`. Attribution and historical changelog entries remain.
 Fork modifications include CLI/hardware error handling, controller coordination,
 the SwiftUI manager, Metal/CPU workers, scheduling, history, prediction and
 release packaging; see `CHANGELOG.md` and Git history.
